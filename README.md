@@ -194,7 +194,7 @@ writes `/etc/hearth.env` (mode 640; template in `deploy/hearth.env.example`), in
 `/etc/caddy/Caddyfile.d/hearth.caddy`. Your existing `/etc/caddy/Caddyfile` is kept: an
 `import /etc/caddy/Caddyfile.d/*.caddy` line is appended (a backup is saved first; only Caddy's
 untouched placeholder is replaced). The hostname is `$HEARTH_DOMAIN` or
-`<public-ip-with-dashes>.sslip.io`. It opens TCP 80/443 in iptables (Oracle's Ubuntu images
+`hearth.<public-ip-with-dashes>.sslip.io`. It opens TCP 80/443 in iptables (Oracle's Ubuntu images
 reject them by default) and saves the rules with `netfilter-persistent`; with ufw active it adds
 ufw rules instead.
 

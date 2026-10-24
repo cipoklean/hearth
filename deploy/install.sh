@@ -5,7 +5,8 @@
 #
 # Run as your normal user (it uses sudo). Safe to run again: every step checks first.
 # Optional environment:
-#   HEARTH_DOMAIN=hearth.example.com   hostname for HTTPS (default: <public-ip-with-dashes>.sslip.io)
+#   HEARTH_DOMAIN=hearth.example.com   hostname for HTTPS (default: hearth.<public-ip-with-dashes>.sslip.io)
+#   HEARTH_PYTHON=python3.11            interpreter to use (default: first of 3.11, 3.12, 3.13, python3 that is >= 3.11)
 #   QLOO_API_KEY=...                   used when /etc/hearth.env has no key and there is no terminal
 #   HEARTH_SKIP_FIREWALL=1             leave iptables/ufw alone
 #
@@ -56,7 +57,7 @@ ok "base packages present"
 
 py_ok() { "$1" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>/dev/null; }
 PY=""
-for cand in python3 python3.13 python3.12 python3.11; do
+for cand in ${HEARTH_PYTHON:-} python3.11 python3.12 python3.13 python3; do
   if command -v "$cand" >/dev/null && py_ok "$cand"; then PY="$(command -v "$cand")"; break; fi
 done
 if [[ -z "$PY" ]]; then
@@ -150,7 +151,7 @@ if [[ -z "$DOMAIN" ]]; then
     IP=""
   done
   [[ -n "$IP" ]] || die "Could not find this VM's public IPv4. Re-run with HEARTH_DOMAIN=<hostname>."
-  DOMAIN="${IP//./-}.sslip.io"
+  DOMAIN="hearth.${IP//./-}.sslip.io"
 fi
 [[ "$DOMAIN" =~ ^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$ ]] || die "HEARTH_DOMAIN '$DOMAIN' is not a valid hostname."
 env_set HEARTH_DOMAIN "$DOMAIN"
@@ -185,10 +186,19 @@ if ! command -v caddy >/dev/null; then
 else
   ok "found $(caddy version | cut -d' ' -f1)"
 fi
-$SUDO "$DEPLOY/caddy-site.sh" "$DOMAIN" /etc/caddy | sed 's/^/    /'
 CF=/etc/caddy/Caddyfile
-$SUDO caddy validate --config "$CF" --adapter caddyfile >/dev/null 2>&1 \
-  || { $SUDO caddy validate --config "$CF" --adapter caddyfile; die "Caddy config invalid; see above. $CF.bak.* holds your previous file."; }
+CF_SNAP="$(mktemp)"; HAD_CF=0
+if [[ -f "$CF" ]]; then $SUDO cat "$CF" > "$CF_SNAP"; HAD_CF=1; fi
+$SUDO "$DEPLOY/caddy-site.sh" "$DOMAIN" /etc/caddy | sed 's/^/    /'
+if ! $SUDO caddy validate --config "$CF" --adapter caddyfile >/dev/null 2>&1; then
+  $SUDO caddy validate --config "$CF" --adapter caddyfile || true
+  # roll back so the live Caddy config (and any other sites) is exactly as before
+  $SUDO rm -f /etc/caddy/Caddyfile.d/hearth.caddy
+  if (( HAD_CF )); then $SUDO tee "$CF" < "$CF_SNAP" >/dev/null; else $SUDO rm -f "$CF"; fi
+  rm -f "$CF_SNAP"
+  die "Caddy config invalid; see above. Rolled back, Caddy was not reloaded and other sites are untouched."
+fi
+rm -f "$CF_SNAP"
 $SUDO systemctl enable caddy >/dev/null 2>&1
 if $SUDO systemctl is-active --quiet caddy; then $SUDO systemctl reload caddy; else $SUDO systemctl start caddy; fi
 ok "Caddy serving https://$DOMAIN"
