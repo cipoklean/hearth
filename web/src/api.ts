@@ -10,9 +10,12 @@ export interface Entity {
   id: string; name: string; type: string; tags: Tag[];
   properties: Record<string, any>; weight?: number;
 }
-export interface Profile {
+export type EraMode = "auto" | "year" | "off";
+export interface Era { max_year: number; source: "auto" | "set"; explanation: string; label: string }
+export interface EraSetting { era_mode: EraMode; era_max_year: number | null }
+export interface Profile extends EraSetting {
   resident_id: string; name: string; entities: Entity[]; tags: Tag[];
-  disliked: string[]; needs: Need[];
+  disliked: string[]; needs: Need[]; era: Era | null;
 }
 export interface Home { id: string; name: string; city: string; demo: boolean; residents?: number; mock?: boolean }
 
@@ -41,7 +44,7 @@ export interface ResidentFit { resident_id: string; name: string; relative_fit: 
 export interface LeftOut { resident_id: string; name: string; relative_fit: number; alternative: Entity | null; alternative_fit: number | null; reason: string }
 export interface GroupPick {
   domain: string; pick: Entity | null; fits: ResidentFit[]; left_out: LeftOut[];
-  excluded: { entity: Entity; reason: string }[]; unresolved: Resolution[]; considered: number;
+  excluded: { entity: Entity; reason: string }[]; unresolved: Resolution[]; considered: number; notes: string[];
 }
 export interface SearchHit {
   id: string; name: string; type: string; image: string | null; year: number | null;
@@ -88,6 +91,12 @@ const qs = (o: Record<string, string | string[] | undefined>) => {
   return s ? "?" + s : "";
 };
 
+// Release year travels with a favourite: it sets the resident's automatic film/TV era.
+const entityIn = (e: Entity) => {
+  const y = e.properties?.release_year;
+  return { id: e.id, name: e.name, type: e.type, tags: e.tags.slice(0, 20), ...(typeof y === "number" ? { year: y } : {}) };
+};
+
 export const api = {
   home: () => req<Home>("GET", "/home"),
   setHome: (name?: string, city?: string) => req<Home>("PUT", "/home", { name, city }),
@@ -95,11 +104,12 @@ export const api = {
   seedDemo: () => req<{ home: Home; created: number }>("POST", "/demo"),
   residents: () => req<Profile[]>("GET", "/residents"),
   resident: (id: string) => req<Profile>("GET", `/residents/${id}`),
-  createResident: (name: string, entities: Entity[], needs: Need[]) =>
+  createResident: (name: string, entities: Entity[], needs: Need[], era?: EraSetting) =>
     req<Profile>("POST", "/residents", {
-      name, needs,
-      entities: entities.map((e) => ({ id: e.id, name: e.name, type: e.type, tags: e.tags.slice(0, 20) })),
+      name, needs, ...(era || {}),
+      entities: entities.map(entityIn),
     }),
+  setEra: (id: string, era: EraSetting) => req<Profile>("PUT", `/residents/${id}/era`, era),
   deleteResident: (id: string) => req<void>("DELETE", `/residents/${id}`),
   history: (id: string) => req<HistoryRow[]>("GET", `/residents/${id}/history`),
   plan: (id: string, skip: string[] = [], skipCuisine: string[] = []) =>
@@ -110,7 +120,7 @@ export const api = {
   feedback: (residentId: string, entity: Entity, enjoyed: boolean) =>
     req<Profile>("POST", "/feedback", {
       resident_id: residentId, enjoyed,
-      entity: { id: entity.id, name: entity.name, type: entity.type, tags: entity.tags.slice(0, 20) },
+      entity: entityIn(entity),
     }),
   search: (q: string, domain: string) =>
     req<{ results: SearchHit[] }>("GET", `/search${qs({ q, domain })}`),

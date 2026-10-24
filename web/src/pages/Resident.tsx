@@ -1,7 +1,8 @@
-import { api } from "../api";
+import { useState } from "react";
+import { api, type EraSetting } from "../api";
 import { Icon } from "../components/Icon";
-import { Collage, Empty, ErrorNote, Loading, NeedBadge, Photo, Stamp } from "../components/ui";
-import { DOMAINS, favourites, kindOf, needInfo, SLOT, tasteLine, yearOf } from "../lib";
+import { Collage, Empty, EraPicker, ErrorNote, Loading, NeedBadge, Photo, Source, Stamp, useToast } from "../components/ui";
+import { autoEra, DOMAINS, favourites, kindOf, needInfo, SLOT, tasteLine, yearOf } from "../lib";
 import { usePlan } from "../plan";
 import { Link } from "../router";
 import { useAsync } from "../state";
@@ -10,6 +11,22 @@ export function ResidentPage({ id }: { id: string }) {
   const prof = useAsync(() => api.resident(id), [id]);
   const hist = useAsync(() => api.history(id), [id]);
   const { plan, loading, error, reload } = usePlan(id);
+  const [savingEra, setSavingEra] = useState(false);
+  const toast = useToast();
+
+  async function saveEra(v: EraSetting) {
+    setSavingEra(true);
+    try {
+      const np = await api.setEra(id, v);
+      prof.reload();
+      await reload(true);
+      toast(np.era ? `Film nights for ${np.name} now stay up to ${np.era.max_year}.` : `No era limit for ${np.name}'s films.`);
+    } catch (e) {
+      toast(`Couldn't save that: ${e instanceof Error ? e.message : e}`);
+    } finally {
+      setSavingEra(false);
+    }
+  }
 
   if (prof.error) return <main className="page"><ErrorNote error={prof.error} retry={prof.reload} /><Link to="/">Back to residents</Link></main>;
   if (!prof.data) return <main className="page"><Loading label="Fetching their taste card…" /></main>;
@@ -63,6 +80,11 @@ export function ResidentPage({ id }: { id: string }) {
             </ul>
           )}
           <p className="small muted"><Icon name="shield" size={14} /> Checked by Hearth care rules, never by Qloo.</p>
+
+          <h2 className="panel__title panel__title--spaced">Film and TV era</h2>
+          <p className="small muted"><Source kind="setting" /> {p.era ? `Film nights and swaps stay up to ${p.era.max_year}${p.era.source === "auto" ? " (newest favourite film + 10 years)" : ""}.` : "No era limit: any release year."}</p>
+          <EraPicker key={`${p.era_mode}-${p.era_max_year}`} value={{ era_mode: p.era_mode, era_max_year: p.era_max_year }}
+            onChange={saveEra} auto={autoEra(p.entities.filter((e) => !p.disliked.includes(e.id)))} name={p.name} disabled={savingEra} />
 
           <h2 className="panel__title panel__title--spaced">What they enjoyed</h2>
           {hist.data && hist.data.length > 0 ? (

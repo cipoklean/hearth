@@ -130,12 +130,27 @@ export function GroupPage() {
                 })}
               </ul>
 
-              {res.excluded.length > 0 && (
+              {res.excluded.some(isEra) && (
                 <details className="excluded">
-                  <summary><Icon name="shield" size={18} />{res.excluded.length} option{res.excluded.length === 1 ? "" : "s"} set aside by care rules</summary>
+                  <summary><Icon name="clock" size={18} />{res.excluded.filter(isEra).length} option{res.excluded.filter(isEra).length === 1 ? "" : "s"} outside someone's film era</summary>
+                  <p className="small muted">Suggestions stay within every attendee's era. <Source kind="setting" /></p>
+                  <ul>
+                    {res.excluded.filter(isEra).map((x) => (
+                      <li key={x.entity.id}>
+                        <Photo entity={x.entity} size={40} shape="square" />
+                        <span><strong>{x.entity.name}</strong><span className="muted"> · {x.reason.replace(/\. Era: Hearth setting/g, "")}</span></span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              {res.notes?.length > 0 && <ul className="small muted">{res.notes.map((n) => <li key={n}>{n}</li>)}</ul>}
+              {res.excluded.some((x) => !isEra(x)) && (
+                <details className="excluded">
+                  <summary><Icon name="shield" size={18} />{res.excluded.filter((x) => !isEra(x)).length} option{res.excluded.filter((x) => !isEra(x)).length === 1 ? "" : "s"} set aside by care rules</summary>
                   <p className="small muted">These might fit people's taste, but break someone's care need. <Source kind="rule" /></p>
                   <ul>
-                    {res.excluded.map((x) => (
+                    {res.excluded.filter((x) => !isEra(x)).map((x) => (
                       <li key={x.entity.id}>
                         <Photo entity={x.entity} size={40} shape="square" />
                         <span><strong>{x.entity.name}</strong><span className="muted"> · {x.reason.replace(/ \(Hearth rule, not Qloo\)$/, "")}</span></span>
@@ -152,3 +167,5 @@ export function GroupPage() {
     </main>
   );
 }
+
+const isEra = (x: { reason: string }) => x.reason.includes("Era: Hearth setting");

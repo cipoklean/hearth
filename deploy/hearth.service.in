@@ -1,0 +1,31 @@
+# Rendered by deploy/install.sh into /etc/systemd/system/hearth.service
+[Unit]
+Description=Hearth - taste-aware care coordinator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=@USER@
+Group=@GROUP@
+WorkingDirectory=@REPO@
+EnvironmentFile=/etc/hearth.env
+# 1 OCPU: two workers at most. Caddy is the only client, so trust its X-Forwarded-For.
+ExecStart=@REPO@/.venv/bin/uvicorn hearth.api:app --host 127.0.0.1 --port 8088 --workers 2 --proxy-headers --forwarded-allow-ips 127.0.0.1 --no-server-header
+Restart=always
+RestartSec=3
+# /var/lib/hearth, owned by @USER@, holds the database and Qloo cache
+StateDirectory=hearth
+StateDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# Shares the VM with other services: keep Hearth small.
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

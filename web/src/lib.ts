@@ -91,8 +91,19 @@ export function leadFavourite(c?: CheckResult | null): { name: string; share: st
   }
   return null;
 }
+/** Notes about Hearth settings (the resident's film era, gentle-film ratings), not Qloo taste. */
+export const isSettingNote = (n: string) => /Era: Hearth setting|^Gentle films:/.test(n);
+export const settingNotes = (c?: CheckResult | null) => (c?.evidence?.notes || []).filter(isSettingNote);
 export const otherNotes = (c?: CheckResult | null) =>
-  (c?.evidence?.notes || []).filter((n) => !/^Qloo links this most to/.test(n));
+  (c?.evidence?.notes || []).filter((n) => !/^Qloo links this most to/.test(n) && !isSettingNote(n));
+
+export const ERA_MARGIN = 10;
+/** The automatic era: newest favourite film/TV release year + ERA_MARGIN (mirrors the server). */
+export function autoEra(entities: Entity[]): number | null {
+  const ys = entities.filter((e) => ["movie", "tv_show"].includes(kindOf(e.type)) && (e.weight ?? 1) > 0)
+    .map((e) => e.properties?.release_year).filter((y): y is number => typeof y === "number");
+  return ys.length ? Math.max(...ys) + ERA_MARGIN : null;
+}
 
 export const pct = (x: number | null | undefined) => (x == null ? "–" : `${Math.round(x * 100)}%`);
 

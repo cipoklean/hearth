@@ -26,7 +26,11 @@ LABEL = "Hearth rule, not Qloo"
 DATA = Path(__file__).resolve().parent.parent / "data" / "dishes.json"
 
 SHORT_FILM_MINUTES = 105
-MILD_RATINGS = {"G", "PG", "TV-G", "TV-PG", "TV-Y", "TV-Y7", "U", "Approved", "Passed"}
+MILD_RATINGS = {"G", "PG", "GP", "TV-G", "TV-PG", "TV-Y", "TV-Y7", "U", "Approved", "Passed"}
+# The same ratings as Qloo filter.content_rating values (Qloo's enum has no "U"). Sent with
+# film/TV ranked lists for residents with the mild_content need, so picks and swaps are gentle
+# before Hearth's own rule runs. Unrated titles drop out of those lists.
+MILD_QLOO_RATINGS = ("G", "PG", "GP", "TV-G", "TV-PG", "TV-Y", "TV-Y7", "Approved", "Passed")
 STRONG_RATINGS = {"R", "NC-17", "TV-MA", "18+"}
 INTENSE_TAG_KEYS = ("horror", "war", "thriller", "slasher")
 LOUD_TAG_KEYS = ("nightclub", "heavy_metal", "punk", "rave")

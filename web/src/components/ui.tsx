@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useState } from "react";
-import type { CheckResult, Entity, Need, Profile, RuleResult, VerdictKind } from "../api";
+import type { CheckResult, Entity, EraSetting, Need, Profile, RuleResult, VerdictKind } from "../api";
 import { Link } from "../router";
-import { domainLabel, displayTags, favourites, imageOf, initials, leadFavourite, needInfo, otherNotes, pct, sentence, tasteLine, VERDICT, yearOf } from "../lib";
+import { domainLabel, displayTags, favourites, imageOf, initials, leadFavourite, needInfo, otherNotes, pct, sentence, settingNotes, tasteLine, VERDICT, yearOf } from "../lib";
 import { Icon } from "./Icon";
 
 /* ---------- verdict stamp & source labels ---------- */
@@ -13,7 +13,8 @@ export function Stamp({ verdict, size = "md" }: { verdict: VerdictKind; size?: "
   );
 }
 
-export function Source({ kind }: { kind: "qloo" | "rule" }) {
+export function Source({ kind }: { kind: "qloo" | "rule" | "setting" }) {
+  if (kind === "setting") return <span className="source source--setting"><Icon name="clock" size={14} />Hearth setting</span>;
   return kind === "qloo" ? (
     <span className="source source--qloo"><span className="source__dot" aria-hidden />Qloo taste</span>
   ) : (
@@ -87,6 +88,7 @@ export function EvidenceBlock({ check, rules, residentName, compact }: {
   const ev = check?.evidence;
   const tags = ev?.shared_tags?.length ? displayTags(ev.shared_tags, 4) : [];
   const notes = otherNotes(check);
+  const settings = settingNotes(check);
   return (
     <div className={"evidence" + (compact ? " evidence--compact" : "")}>
       {check && (
@@ -108,6 +110,14 @@ export function EvidenceBlock({ check, rules, residentName, compact }: {
             )}
             {notes.map((n) => <li key={n} className="muted">{sentence(n)}</li>)}
             {!lead && !tags.length && ev?.relative_fit == null && !notes.length && <li className="muted">{sentence(check.resolution?.reason || "No further detail from Qloo.")}</li>}
+          </ul>
+        </div>
+      )}
+      {settings.length > 0 && (
+        <div className="evidence__group">
+          <Source kind="setting" />
+          <ul className="evidence__list">
+            {settings.map((n) => <li key={n}>{sentence(n)}</li>)}
           </ul>
         </div>
       )}
@@ -198,5 +208,45 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         {items.map((t) => <div key={t.id} className="toast"><Icon name="flame" size={18} />{t.msg}</div>)}
       </div>
     </ToastCtx.Provider>
+  );
+}
+
+/* ---------- film & TV era (a Hearth setting) ---------- */
+export function EraPicker({ value, onChange, auto, name, disabled }: {
+  value: EraSetting; onChange: (v: EraSetting) => void; auto: number | null; name: string; disabled?: boolean;
+}) {
+  const thisYear = new Date().getFullYear();
+  const [draft, setDraft] = useState(String(value.era_max_year ?? auto ?? 1970));
+  const opts: { mode: EraSetting["era_mode"]; label: string; hint: string }[] = [
+    { mode: "auto", label: "Automatic", hint: auto ? `Up to ${auto}: newest favourite film + 10 years` : "Add a favourite film or TV programme to set this" },
+    { mode: "year", label: "Up to a year", hint: "Choose the latest release year" },
+    { mode: "off", label: "Any era", hint: "No limit on release year" },
+  ];
+  const commitYear = (raw: string) => {
+    const y = parseInt(raw, 10);
+    if (y >= 1900 && y <= thisYear + 1) onChange({ era_mode: "year", era_max_year: y });
+  };
+  return (
+    <fieldset className="era" disabled={disabled}>
+      <legend className="sr-only">Film and TV era for {name}</legend>
+      <div className="era__opts" role="radiogroup" aria-label={`Film and TV era for ${name}`}>
+        {opts.map((o) => {
+          const on = value.era_mode === o.mode;
+          return (
+            <button key={o.mode} type="button" role="radio" aria-checked={on} className={"era__opt" + (on ? " is-on" : "")}
+              onClick={() => (o.mode === "year" ? commitYear(draft) : onChange({ era_mode: o.mode, era_max_year: null }))}>
+              <strong>{o.label}</strong><span className="muted small">{o.hint}</span>
+            </button>
+          );
+        })}
+      </div>
+      {value.era_mode === "year" && (
+        <label className="field era__year"><span>Films and TV released up to</span>
+          <input type="number" inputMode="numeric" min={1900} max={thisYear + 1} value={draft}
+            onChange={(e) => setDraft(e.target.value)} onBlur={(e) => commitYear(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitYear((e.target as HTMLInputElement).value); } }} />
+        </label>
+      )}
+    </fieldset>
   );
 }

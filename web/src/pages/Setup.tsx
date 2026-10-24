@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Entity, type Need, type Profile, type SearchHit } from "../api";
+import { api, type Entity, type EraSetting, type Need, type Profile, type SearchHit } from "../api";
 import { Icon } from "../components/Icon";
-import { ErrorNote, Photo, TasteCard } from "../components/ui";
-import { DOMAINS, type DomainKey, NEEDS } from "../lib";
+import { EraPicker, ErrorNote, Photo, Source, TasteCard } from "../components/ui";
+import { autoEra, DOMAINS, type DomainKey, NEEDS } from "../lib";
 import { Link, navigate } from "../router";
 import { useHome } from "../state";
 
@@ -22,6 +22,7 @@ export function Setup() {
   const [name, setName] = useState("");
   const [picked, setPicked] = useState<Entity[]>([]);
   const [needs, setNeeds] = useState<Need[]>([]);
+  const [era, setEra] = useState<EraSetting>({ era_mode: "auto", era_max_year: null });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<unknown>(null);
   const [created, setCreated] = useState<Profile | null>(null);
@@ -44,7 +45,7 @@ export function Setup() {
     setSaving(true);
     setErr(null);
     try {
-      const p = await api.createResident(name.trim(), picked, needs);
+      const p = await api.createResident(name.trim(), picked, needs, era);
       await refresh();
       setCreated((await api.residents()).find((r) => r.resident_id === p.resident_id) || p);
       setStep("done");
@@ -56,7 +57,7 @@ export function Setup() {
   }
 
   function restart() {
-    setName(""); setPicked([]); setNeeds([]); setCreated(null); setStep("name");
+    setName(""); setPicked([]); setNeeds([]); setEra({ era_mode: "auto", era_max_year: null }); setCreated(null); setStep("name");
   }
 
   return (
@@ -132,6 +133,11 @@ export function Setup() {
                 </button>
               );
             })}
+          </div>
+          <div className="era-block">
+            <h2 className="panel__title">Films and TV from which years?</h2>
+            <p className="muted small"><Source kind="setting" /> Hearth keeps film nights and swaps to this era, because Qloo's picks lean modern.</p>
+            <EraPicker value={era} onChange={setEra} auto={autoEra(picked)} name={name} />
           </div>
           {err != null && <ErrorNote error={err} />}
           <div className="form__actions">

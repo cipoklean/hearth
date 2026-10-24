@@ -165,6 +165,23 @@ _ENUMS: dict[str, frozenset[str]] = {
     "model": frozenset({"descriptive", "predictive"}),
 }
 
+# filter.content_rating: comma-separated list; enum from the Insights Deep Dive reference
+# (checked 2026-10-24). Live API: filters movie results by these ratings.
+CONTENT_RATINGS = frozenset({
+    "G", "PG", "PG-13", "R", "NC-17", "TV-G", "TV-PG", "TV-14", "TV-MA", "TV-Y", "TV-Y7", "TV-Y7-FV",
+    "Not Rated", "Unrated", "Approved", "Passed", "X", "GP", "M", "13+", "16+", "18+",
+})
+
+# Integer year filters (documented as integers). Live API 2026-10-24: filter.release_year.max
+# limits movie and tv_show insights results to titles released up to that year.
+_YEAR_PARAMS = (
+    "filter.release_year.min", "filter.release_year.max",
+    "filter.publication_year.min", "filter.publication_year.max",
+    "filter.finale_year.min", "filter.finale_year.max",
+    "filter.latest_known_year.min", "filter.latest_known_year.max",
+)
+_YEAR_RANGE = (1800, 2100)
+
 _RANGES: dict[str, tuple[float, float]] = {
     "take": (1, 50),
     "filter.popularity.min": (0, 1),
@@ -187,7 +204,28 @@ def normalize_type(filter_type: str) -> str:
     return t
 
 
+def _as_list(v: Any) -> list[str]:
+    if isinstance(v, (list, tuple, set)):
+        return [str(x).strip() for x in v]
+    return [x.strip() for x in str(v).split(",")]
+
+
 def _check_values(params: Mapping[str, Any]) -> None:
+    if "filter.content_rating" in params:
+        vals = _as_list(params["filter.content_rating"])
+        bad = [x for x in vals if x not in CONTENT_RATINGS]
+        if bad or not vals:
+            raise QlooParamError(f"filter.content_rating values {bad or vals} not in {sorted(CONTENT_RATINGS)}")
+    for key in _YEAR_PARAMS:
+        if key in params:
+            v = params[key]
+            if isinstance(v, bool) or not (isinstance(v, int) or (isinstance(v, str) and v.isdigit())):
+                raise QlooParamError(f"{key} must be an integer year, got {v!r}")
+            if not _YEAR_RANGE[0] <= int(v) <= _YEAR_RANGE[1]:
+                raise QlooParamError(f"{key}={v} outside {_YEAR_RANGE[0]}..{_YEAR_RANGE[1]}")
+    for a, b in (("filter.release_year.min", "filter.release_year.max"),):
+        if a in params and b in params and int(params[a]) > int(params[b]):
+            raise QlooParamError(f"{a} ({params[a]}) is after {b} ({params[b]})")
     for key, allowed in _ENUMS.items():
         if key in params and str(params[key]) not in allowed:
             raise QlooParamError(f"{key}={params[key]!r} not one of {sorted(allowed)}")

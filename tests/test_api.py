@@ -147,3 +147,36 @@ def test_serves_web_app(tmp_path):
         assert c.get("/assets/app.js").status_code == 200
         assert c.get("/api/health").json()["ok"] is True
         assert c.get("/api/nope").status_code == 404
+
+
+def test_era_setting_via_api(api):
+    r = api.get("/api/search", params={"q": "Dancing on the Pier", "domain": "movie"})
+    hit = r.json()["results"][0]
+    body = {"name": "Rose", "entities": [{"id": hit["id"], "name": hit["name"], "type": "movie",
+                                          "tags": hit["tags"], "year": hit["year"]}], "needs": ["mild_content"]}
+    p = api.post("/api/residents", json=body).json()
+    assert p["era"]["max_year"] == hit["year"] + 10 and p["era"]["source"] == "auto"
+    assert p["era"]["label"] == "Era: Hearth setting"
+    rid = p["resident_id"]
+    plan = api.get(f"/api/residents/{rid}/plan").json()
+    film = next(i for i in plan["items"] if i["slot"] == "film_night")
+    assert film["entity"]["properties"]["release_year"] <= p["era"]["max_year"]
+    assert any(n.startswith("Era: Hearth setting") for n in film["check"]["evidence"]["notes"])
+
+    r = api.put(f"/api/residents/{rid}/era", json={"era_mode": "year", "era_max_year": 1990})
+    assert r.status_code == 200 and r.json()["era"]["max_year"] == 1990 and r.json()["era"]["source"] == "set"
+    assert api.put(f"/api/residents/{rid}/era", json={"era_mode": "year"}).status_code == 422
+    assert api.put(f"/api/residents/{rid}/era", json={"era_mode": "year", "era_max_year": 1200}).status_code == 422
+    r = api.put(f"/api/residents/{rid}/era", json={"era_mode": "off"})
+    assert r.json()["era"] is None and r.json()["era_max_year"] is None
+    assert api.put("/api/residents/nope/era", json={"era_mode": "off"}).status_code == 404
+
+
+def test_demo_keeps_each_favourites_own_year(api):
+    assert api.post("/api/demo").status_code == 200
+    rose = next(p for p in api.get("/api/residents").json() if p["name"] == "Rose")
+    years = {e["name"]: e["properties"].get("release_year") for e in rose["entities"] if e["type"].endswith("movie")}
+    assert years == {"Dancing on the Pier": 1952}
+    assert rose["era"]["max_year"] == 1962
+    margaret = next(p for p in api.get("/api/residents").json() if p["name"] == "Margaret")
+    assert margaret["era"]["max_year"] == 1964  # Harbour Lights (1954)

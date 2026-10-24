@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from ..constraints import (Dish, RuleResult, check_entity, cuisine_key, dishes_for, entity_filter,
                            passes)
 from ..constraints.rules import CUISINE_NAMES
+from ..era import filter_notes, ranked_filters
 from ..models import EntityRef, Profile
 from ..qloo import QlooClient
 from ..verifier import Candidate, CheckResult, Resolution, ResolutionStatus, assess, top_for
@@ -81,7 +82,8 @@ def _not_an_outing(e: EntityRef) -> bool:
 
 
 def _pick_activity(ranked: list[EntityRef], profile: Profile, facts: Mapping[str, Mapping[str, Any]],
-                   used: set[str], slot: str, day: str, *, skip_cuisine_only: bool = False) -> PlanItem:
+                   used: set[str], slot: str, day: str, *, skip_cuisine_only: bool = False,
+                   best_ranked: list[EntityRef] | None = None, filter_note: list[str] | None = None) -> PlanItem:
     ok = entity_filter(profile.needs, facts)
     for e in ranked:
         if e.id in used or e.id in profile.disliked:
@@ -95,14 +97,16 @@ def _pick_activity(ranked: list[EntityRef], profile: Profile, facts: Mapping[str
             continue
         cand = Candidate(name=e.name, domain=e.type.rsplit(":", 1)[-1], entity_id=e.id)
         res = Resolution(status=ResolutionStatus.resolved, entity=e)
-        check = assess(cand, res, e, ranked, profile, swap_filter=ok)
+        check = assess(cand, res, e, ranked, profile, swap_filter=ok, best_ranked=best_ranked,
+                       notes=filter_note or ())
         used.add(e.id)
-        notes = [f"staff to confirm: {r.reason}" for r in rules if r.outcome.value == "unknown"]
+        notes = [*(filter_note or []), *(f"staff to confirm: {r.reason}" for r in rules if r.outcome.value == "unknown")]
         if any(x.id == e.id for x in profile.entities):
             notes.insert(0, "a known favourite (already in their profile)")
         return PlanItem(day=day, slot=slot, title=e.name, entity=e, check=check, rules=rules, notes=notes)
     return PlanItem(day=day, slot=slot, title="(no suitable pick found)",
-                    notes=["no Qloo result passed this resident's care rules; staff to choose"])
+                    notes=["no Qloo result passed this resident's care rules"
+                           + (" and era setting" if filter_note else "") + "; staff to choose", *(filter_note or [])])
 
 
 async def weekly_plan(client: QlooClient, profile: Profile, *,
@@ -114,10 +118,19 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
     facts = facts or {}
     skip_c = set(skip_cuisines or [])
     ranked: dict[str, list[EntityRef]] = {}
+    best: dict[str, list[EntityRef]] = {}     # unfiltered lists for "best available" (film/TV)
+    fnotes: dict[str, list[str]] = {}
     for _, _, etype in SCHEDULE:
         if etype not in ranked:
             extra = place_extra if etype == "urn:entity:place" else None
-            ranked[etype] = await top_for(client, profile, etype, take=20, extra=extra)
+            if hf := ranked_filters(profile, etype):
+                # Picks and swaps from Qloo's list narrowed to the era / gentle ratings (Hearth settings);
+                # verdicts still measured against the unfiltered best so thresholds keep their meaning.
+                ranked[etype] = await top_for(client, profile, etype, take=20, extra={**(extra or {}), **hf})
+                best[etype] = await top_for(client, profile, etype, take=20, extra=extra)
+                fnotes[etype] = filter_notes(profile, etype)
+            else:
+                ranked[etype] = await top_for(client, profile, etype, take=20, extra=extra)
     # Meal themes: restaurants Qloo ranks for this person (one call); falls back to all places.
     meals = await top_for(client, profile, "urn:entity:place", take=50,
                           extra={**(place_extra or {}), "filter.tags": RESTAURANT_TAG})
@@ -141,5 +154,6 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
             meal_i += 1
         else:
             items.append(_pick_activity(ranked[etype], profile, facts, used, slot, day,
-                                        skip_cuisine_only=(slot == "outing")))
+                                        skip_cuisine_only=(slot == "outing"), best_ranked=best.get(etype),
+                                        filter_note=fnotes.get(etype)))
     return WeeklyPlan(resident_id=profile.resident_id, name=profile.name, items=items)

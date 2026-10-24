@@ -60,14 +60,22 @@ CREATE TABLE IF NOT EXISTS venue_facts (
 
 class Store:
     def __init__(self, path: str = "hearth.db"):
-        self._conn = sqlite3.connect(path, check_same_thread=False)
+        self._conn = sqlite3.connect(path, check_same_thread=False, timeout=10.0)
         self._conn.row_factory = sqlite3.Row
+        if path != ":memory:":  # several uvicorn workers may share the file
+            self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.executescript(SCHEMA)
         cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(residents)")}
         if "home_id" not in cols:  # older DBs: one implicit home
             self._conn.execute("ALTER TABLE residents ADD COLUMN home_id TEXT NOT NULL DEFAULT 'default'")
-            self._conn.commit()
+        if "era_mode" not in cols:  # era setting (Hearth, not Qloo)
+            self._conn.execute("ALTER TABLE residents ADD COLUMN era_mode TEXT NOT NULL DEFAULT 'auto'")
+            self._conn.execute("ALTER TABLE residents ADD COLUMN era_max_year INTEGER")
+        ecols = {r["name"] for r in self._conn.execute("PRAGMA table_info(resident_entities)")}
+        if "year" not in ecols:  # release year of a favourite film/show (a public fact; sets the auto era)
+            self._conn.execute("ALTER TABLE resident_entities ADD COLUMN year INTEGER")
+        self._conn.commit()
         self._lock = threading.Lock()
 
     def close(self) -> None:
@@ -75,11 +83,13 @@ class Store:
 
     # ---- residents -----------------------------------------------------------
     def create_resident(self, name: str, entities: list[EntityRef], tags: list[Tag],
-                        needs: list[Need], home_id: str = "default") -> Profile:
+                        needs: list[Need], home_id: str = "default", era_mode: str = "auto",
+                        era_max_year: int | None = None) -> Profile:
         rid = uuid.uuid4().hex[:12]
         with self._lock, self._conn:
-            self._conn.execute("INSERT INTO residents (id, name, needs, home_id) VALUES (?, ?, ?, ?)",
-                               (rid, name, json.dumps([n.value for n in needs]), home_id))
+            self._conn.execute(
+                "INSERT INTO residents (id, name, needs, home_id, era_mode, era_max_year) VALUES (?, ?, ?, ?, ?, ?)",
+                (rid, name, json.dumps([n.value for n in needs]), home_id, era_mode, era_max_year))
             for e in entities:
                 self._upsert_entity(rid, e, e.weight, False)
             for t in tags:
@@ -91,10 +101,20 @@ class Store:
         return prof
 
     def _upsert_entity(self, rid: str, e: EntityRef, weight: float, disliked: bool) -> None:
+        y = e.properties.get("release_year")
+        year = int(y) if isinstance(y, (int, float)) and not isinstance(y, bool) else None
         self._conn.execute(
-            "INSERT OR REPLACE INTO resident_entities (resident_id, entity_id, name, type, tags, weight, disliked)"
-            " VALUES (?,?,?,?,?,?,?)",
-            (rid, e.id, e.name, e.type, json.dumps([t.model_dump() for t in e.tags]), weight, int(disliked)))
+            "INSERT OR REPLACE INTO resident_entities (resident_id, entity_id, name, type, tags, weight, disliked, year)"
+            " VALUES (?,?,?,?,?,?,?,?)",
+            (rid, e.id, e.name, e.type, json.dumps([t.model_dump() for t in e.tags]), weight, int(disliked), year))
+
+    def set_era(self, rid: str, mode: str, max_year: int | None) -> None:
+        with self._lock, self._conn:
+            self._conn.execute("UPDATE residents SET era_mode = ?, era_max_year = ? WHERE id = ?",
+                               (mode, max_year, rid))
+
+    def count_residents(self, home_id: str) -> int:
+        return self._conn.execute("SELECT COUNT(*) FROM residents WHERE home_id = ?", (home_id,)).fetchone()[0]
 
     def home_of(self, rid: str) -> str | None:
         row = self._conn.execute("SELECT home_id FROM residents WHERE id = ?", (rid,)).fetchone()
@@ -156,18 +176,22 @@ class Store:
                 "SELECT * FROM resident_entities WHERE resident_id = ? ORDER BY entity_id", (rid,)):
             if r["disliked"]:
                 disliked.append(r["entity_id"])
+            props = {"release_year": r["year"]} if r["year"] is not None else {}
             ents.append(EntityRef(id=r["entity_id"], name=r["name"], type=r["type"],
-                                  tags=[Tag(**t) for t in json.loads(r["tags"])], weight=r["weight"]))
+                                  tags=[Tag(**t) for t in json.loads(r["tags"])], weight=r["weight"],
+                                  properties=props))
         tags = [Tag(id=r["tag_id"], name=r["name"], weight=r["weight"]) for r in self._conn.execute(
             "SELECT * FROM resident_tags WHERE resident_id = ? ORDER BY tag_id", (rid,))]
         return Profile(resident_id=rid, name=row["name"], entities=ents, tags=tags, disliked=disliked,
-                       needs=[Need(n) for n in json.loads(row["needs"])])
+                       needs=[Need(n) for n in json.loads(row["needs"])],
+                       era_mode=row["era_mode"] or "auto", era_max_year=row["era_max_year"])
 
     def save_profile(self, p: Profile) -> None:
         assert p.resident_id
         with self._lock, self._conn:
-            self._conn.execute("UPDATE residents SET name = ?, needs = ? WHERE id = ?",
-                               (p.name, json.dumps([n.value for n in p.needs]), p.resident_id))
+            self._conn.execute("UPDATE residents SET name = ?, needs = ?, era_mode = ?, era_max_year = ? WHERE id = ?",
+                               (p.name, json.dumps([n.value for n in p.needs]), p.era_mode, p.era_max_year,
+                                p.resident_id))
             self._conn.execute("DELETE FROM resident_entities WHERE resident_id = ?", (p.resident_id,))
             for e in p.entities:
                 self._upsert_entity(p.resident_id, e, e.weight, e.id in p.disliked)

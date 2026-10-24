@@ -1,0 +1,15 @@
+# Hearth site block. Rendered by deploy/install.sh into /etc/caddy/Caddyfile.d/hearth.caddy
+# and pulled in by an `import` line in /etc/caddy/Caddyfile (other sites are left alone).
+@DOMAIN@ {
+	encode zstd gzip
+	request_body {
+		max_size 1MB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+	reverse_proxy 127.0.0.1:8088
+}

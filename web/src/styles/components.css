@@ -207,3 +207,13 @@
 .picker__tick { position: absolute; top: 0.6rem; right: 0.6rem; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--paper-2); color: var(--ink-2); }
 .picker.is-on { border-color: var(--ember); box-shadow: 0 0 0 2px var(--ember) inset, var(--shadow-card); }
 .picker.is-on .picker__tick { background: var(--ember); color: #fff; }
+
+/* ---------- era setting ---------- */
+.source--setting { background: #ece6f3; color: #4a3566; border: 1.5px solid #c8b8dc; }
+.era { border: 0; padding: 0; margin: 0; display: grid; gap: 0.8rem; }
+.era__opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 0.6rem; }
+.era__opt { display: grid; gap: 0.2rem; text-align: left; padding: 0.8rem 1rem; font: inherit; color: var(--ink); background: var(--card-2); border: 2px solid var(--line); border-radius: var(--radius); cursor: pointer; }
+.era__opt.is-on { border-color: #4f8a57; background: #eef5ea; }
+.era__opt:focus-visible { outline: none; border-color: var(--ember); box-shadow: 0 0 0 4px var(--ember-soft); }
+.era__year input { max-width: 10rem; }
+.era-block { margin-top: 1.6rem; }

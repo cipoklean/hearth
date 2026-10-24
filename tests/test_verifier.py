@@ -66,12 +66,16 @@ def test_leading_favourite():
     assert lead and lead.entity_id == "a"
 
 
-async def test_verify_batches_calls_per_domain(client, ada):
+async def test_verify_batches_calls_per_domain(client, ada, bayo):
     names = ["Dancing on the Pier", "Midnight in the Cellar", "Iron Front", "Dust Road West"]
     before = client.request_count
-    await verify(client, ada, [Candidate(name=n, domain="movie") for n in names])
+    await verify(client, bayo, [Candidate(name=n, domain="movie") for n in names])
     # 4 searches + 1 ranked list + 1 batch score
     assert client.request_count - before == len(names) + 2
+    before = client.request_count
+    await verify(client, ada, [Candidate(name=n, domain="movie") for n in names])
+    # Ada needs gentle films: + 1 ranked list narrowed by content rating for swaps
+    assert client.request_count - before == len(names) + 3
 
 
 async def test_verdicts_end_to_end(client, ada):

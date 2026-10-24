@@ -172,6 +172,13 @@ class MockQloo:
             pool = [e for e in pool if ftags & set(e["tags"])]
         if xtags := set(_split(q.get("filter.exclude.tags"))):
             pool = [e for e in pool if not xtags & set(e["tags"])]
+        # Year and rating filters (mock assumption: titles without the field are dropped).
+        if (ymax := q.get("filter.release_year.max")) is not None:
+            pool = [e for e in pool if (e["properties"].get("release_year") or 10**6) <= int(ymax)]
+        if (ymin := q.get("filter.release_year.min")) is not None:
+            pool = [e for e in pool if (e["properties"].get("release_year") or -1) >= int(ymin)]
+        if ratings := set(_split(q.get("filter.content_rating"))):
+            pool = [e for e in pool if e["properties"].get("content_rating") in ratings]
         scored = [(self.affinity(e, sig_tags, sig_fams) if (sig_tags or sig_ents) else e["popularity"], e)
                   for e in pool]
         scored.sort(key=lambda x: (-x[0], x[1]["entity_id"]))

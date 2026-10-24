@@ -53,6 +53,7 @@ FastAPI serves the built app at `/` and the JSON API under `/api`
 | **Taste checker** (`POST /api/verify`) | Any list of picks (from staff, family, or an LLM) in -> each resolved to a Qloo entity (ambiguous names come back for confirmation; no match = `cannot_verify`), scored for fit, verdict `good` / `weak` / `poor`, evidence (Qloo affinity, shared tags), and a better-fitting swap that also passes the person's care rules. |
 | **Weekly plan** (`GET /api/residents/{id}/plan`) | Two meal themes (cuisine signal from Qloo, dishes from Hearth's menu library filtered by diet/texture), a music session, a film night, and an outing. Deterministic. |
 | **Group pick** (`POST /api/group-pick`) | One film/outing for several residents, maximising fit across them. Names who is left out and gives each an alternative. Options that fail anyone's care rule are excluded and reported. |
+| **Film & TV era** (`PUT /api/residents/{id}/era`) | Qloo's film picks lean modern (Annie Hall for a 1940s-50s fan). Each resident has an era: by default the newest favourite film/TV release year + 10, or a year staff set, or no limit (setup and resident screens). Film/TV picks, swaps and group suggestions come from Qloo insights with `filter.release_year.max`; residents with *Gentle films* also get `filter.content_rating=G,PG,GP,TV-G,TV-PG,TV-Y,TV-Y7,Approved,Passed`. Verdicts are still measured against the unfiltered best, so calibrated thresholds hold. Evidence says **"Era: Hearth setting"**; a checked title released after the era is flagged and gets an in-era swap. |
 | **Feedback** (`POST /api/feedback`) | Staff mark *enjoyed* / *didn't*; weights change which favourites are sent to Qloo as signals, and disliked items are never suggested again. |
 
 ### How a verdict is made
@@ -135,6 +136,12 @@ under `.cache/qloo` (gitignored). About 80 calls on a cold cache, 0 when warm.
 | `HEARTH_MOCK` | off | `1` = offline synthetic fixtures. |
 | `HEARTH_CACHE_DIR` | `.cache/qloo` | Private response cache (gitignored). |
 | `HEARTH_DB` | `hearth.db` | SQLite file (gitignored). |
+| `HEARTH_WEB_DIST` | `web/dist` | Built web app served at `/`. |
+| `HEARTH_RATE_LIMIT` | `1` | `0` turns the per-IP limits off. |
+| `HEARTH_RATE_QLOO` | `30/60` | Requests per seconds, per IP, for routes that may call Qloo (search, resolve, verify, plan, group pick, demo, resident reads). |
+| `HEARTH_RATE_CREATE` | `20/3600` | Creating residents / seeding the sample home, per IP. |
+| `HEARTH_RATE_API` | `240/60` | Everything else under `/api` (`/api/health` is never limited). |
+| `HEARTH_MAX_RESIDENTS_PER_HOME` | `12` | Cap per care home (409 beyond it). |
 
 ## Layout
 
@@ -147,6 +154,8 @@ hearth/
   verifier/          the taste checker (pure helpers + async steps)
   constraints/       care rules - "Hearth rule, not Qloo"
   planner/           weekly plan + group pick
+  era.py             film/TV era + gentle-rating filters for ranked lists ("Era: Hearth setting")
+  ratelimit.py       per-IP limits for the public demo
   feedback.py        enjoyed/didn't -> profile weights
   storage.py         SQLite
   api.py             FastAPI routes (/api) + serves web/dist at /
@@ -154,6 +163,7 @@ hearth/
   llm.py             LLM provider Protocol (no provider wired)
   data/dishes.json   Hearth's starter menu library
 web/                 Vite + React + TypeScript app (plain CSS; fonts self-hosted via @fontsource)
+deploy/              VM install (systemd + Caddy), update and health-check scripts
 ```
 
 ### Other API routes used by the app
@@ -161,12 +171,52 @@ web/                 Vite + React + TypeScript app (plain CSS; fonts self-hosted
 `GET/PUT/DELETE /api/home` (this browser's home name, town, erase),
 `POST /api/demo` (seed Maple House), `GET /api/search` (photo cards for setup),
 `GET /api/residents`, `DELETE /api/residents/{id}`, `GET /api/residents/{id}/history`,
-`GET /api/residents/{id}/plan?skip=<entity id>&skip_cuisine=<key>` (swaps).
+`GET /api/residents/{id}/plan?skip=<entity id>&skip_cuisine=<key>` (swaps),
+`PUT /api/residents/{id}/era` (`{"era_mode": "auto" | "year" | "off", "era_max_year": 1965}`),
+`GET /api/health` (process + database; no Qloo call).
+
+## Deploy on a VM
+
+Target: an Oracle Cloud Always Free Ampere A1 VM (ARM64, 1 OCPU / 6 GB) running Ubuntu
+22.04 or 24.04, alongside other services. No Docker. Hearth runs as your user under systemd
+(uvicorn on `127.0.0.1:8088`, 2 workers, 1 GB memory cap) behind Caddy, which gets the HTTPS
+certificate by itself.
+
+```bash
+git clone <this repo> ~/hearth && cd ~/hearth
+./deploy/install.sh                       # asks for your Qloo key (hidden); safe to re-run
+# optional: HEARTH_DOMAIN=hearth.example.com ./deploy/install.sh
+```
+
+`install.sh` installs Python 3.11+ and Node (NodeSource) if missing, builds `web/`, creates `.venv`,
+writes `/etc/hearth.env` (mode 640; template in `deploy/hearth.env.example`), installs
+`/etc/systemd/system/hearth.service`, installs Caddy from its official apt repo, and writes
+`/etc/caddy/Caddyfile.d/hearth.caddy`. Your existing `/etc/caddy/Caddyfile` is kept: an
+`import /etc/caddy/Caddyfile.d/*.caddy` line is appended (a backup is saved first; only Caddy's
+untouched placeholder is replaced). The hostname is `$HEARTH_DOMAIN` or
+`<public-ip-with-dashes>.sslip.io`. It opens TCP 80/443 in iptables (Oracle's Ubuntu images
+reject them by default) and saves the rules with `netfilter-persistent`; with ufw active it adds
+ufw rules instead.
+
+**Then open the ports in Oracle Cloud too.** In the console: Networking > Virtual cloud networks >
+your VCN > Security Lists > Default Security List > Add Ingress Rules: source `0.0.0.0/0`, TCP,
+destination port `80`; and the same for `443` (or on the NSG attached to the VM). Then:
+
+```bash
+./deploy/check.sh          # app on 127.0.0.1:8088/api/health, then https://<host>/api/health
+./deploy/update.sh         # later: git pull, rebuild, restart, check
+sudo systemctl status hearth ; journalctl -u hearth -f
+```
+
+Public-demo protection is on by default: per-IP limits (`HEARTH_RATE_*`, counted per worker, so the
+ceiling is up to 2x with 2 workers) and at most 12 residents per care home. The database and Qloo
+cache live in `/var/lib/hearth`, outside the repo.
 
 ## Data and privacy
 
 - Per resident Hearth stores a display name, care needs, confirmed Qloo
-  entity/tag IDs and feedback weights. No dates of birth, rooms, medical
+  entity/tag IDs (with each favourite film's release year, for the era), the era setting and
+  feedback weights. No dates of birth, rooms, medical
   records or free-text notes. `DELETE /api/residents/{id}` removes a resident
   and all their rows.
 - Favourite photos are Qloo image URLs looked up at request time and held in

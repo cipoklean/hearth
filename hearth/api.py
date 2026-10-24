@@ -26,25 +26,39 @@ from . import __version__
 from .constraints import entity_filter
 from .demo import DEMO_CITY, DEMO_HOME, resolve_demo
 from .feedback import apply_feedback
-from .models import EntityRef, Need, Profile, Tag
+from .models import ERA_MAX_YEAR, ERA_MIN_YEAR, EntityRef, EraMode, Need, Profile, Tag
 from .planner import GroupPick, WeeklyPlan, group_pick, weekly_plan
 from .qloo import QlooClient, QlooError, QlooParamError
+from .ratelimit import RateLimiter, buckets_for
 from .storage import Store
 from .verifier import Candidate, Resolution, VerifyReport, domain_to_type, resolve, verify
 from .verifier.core import _tag_rank
 
 
 class EntityIn(BaseModel):
-    id: str
-    name: str
-    type: str
-    tags: list[Tag] = Field(default_factory=list)
+    id: str = Field(max_length=100)
+    name: str = Field(max_length=200)
+    type: str = Field(max_length=40)
+    tags: list[Tag] = Field(default_factory=list, max_length=40)
+    year: int | None = Field(default=None, ge=1800, le=2100,
+                             description="Release year (films/TV); sets the resident's automatic era")
+
+    def to_ref(self, etype: str) -> EntityRef:
+        props = {"release_year": self.year} if self.year is not None else {}
+        return EntityRef(id=self.id, name=self.name, type=etype, tags=self.tags, properties=props)
 
 
-class ResidentIn(BaseModel):
+class EraIn(BaseModel):
+    """Film/TV era (a Hearth setting): auto = newest favourite + 10 years; year = set; off = no limit."""
+    era_mode: EraMode = "auto"
+    era_max_year: int | None = Field(default=None, ge=ERA_MIN_YEAR, le=ERA_MAX_YEAR)
+
+
+class ResidentIn(EraIn):
     name: str = Field(min_length=1, max_length=80, description="Display name only (first name or initials)")
-    entities: list[EntityIn] = Field(default_factory=list, description="Confirmed Qloo entities they like")
-    tags: list[Tag] = Field(default_factory=list, description="Confirmed Qloo tag ids")
+    entities: list[EntityIn] = Field(default_factory=list, max_length=30,
+                                     description="Confirmed Qloo entities they like")
+    tags: list[Tag] = Field(default_factory=list, max_length=30, description="Confirmed Qloo tag ids")
     needs: list[Need] = Field(default_factory=list)
 
 
@@ -84,6 +98,7 @@ class HomeIn(BaseModel):
     city: str | None = Field(default=None, max_length=80, description="Town used to find local outings")
 
 
+MAX_RESIDENTS = int(os.environ.get("HEARTH_MAX_RESIDENTS_PER_HOME", "12"))
 DIST = Path(os.environ.get("HEARTH_WEB_DIST") or Path(__file__).resolve().parent.parent / "web" / "dist")
 _HOME_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 DOMAIN_LABEL = {"artist": "music", "movie": "film", "tv_show": "tv", "place": "place"}
@@ -118,8 +133,24 @@ def _display_tags(e: EntityRef, n: int = 3) -> list[str]:
     return out[:n]
 
 
+def _keep_year(e: EntityRef) -> dict[str, Any]:
+    """The only Qloo property stored with a favourite: its release year (sets the automatic era)."""
+    y = e.properties.get("release_year")
+    return {"release_year": y} if y is not None else {}
+
+
+def _era_or_422(mode: str, year: int | None) -> int | None:
+    if mode == "year" and year is None:
+        raise HTTPException(422, "era_max_year is required when era_mode is 'year'")
+    return year if mode == "year" else None
+
+
 def create_app(client: QlooClient | None = None, db_path: str | None = None,
-               web_dist: Path | None = None) -> FastAPI:
+               web_dist: Path | None = None, rate_limiter: RateLimiter | None | bool = True,
+               max_residents: int | None = None) -> FastAPI:
+    """``rate_limiter``: True = from env (default), False/None = off, or a RateLimiter."""
+    limiter = RateLimiter.from_env() if rate_limiter is True else (rate_limiter or None)
+    cap = MAX_RESIDENTS if max_residents is None else max_residents
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         app.state.qloo = client or QlooClient()
@@ -137,6 +168,20 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
                   description="Taste-aware care coordinator for older adults. Taste from Qloo; "
                               "care rules are Hearth's. JSON API under /api.")
     api = APIRouter(prefix="/api")
+
+    if limiter is not None:
+        @app.middleware("http")
+        async def _rate_limit(request: Request, call_next):
+            buckets = buckets_for(request.method, request.url.path)
+            if buckets:
+                ip = request.client.host if request.client else "unknown"
+                ok, retry, bucket = limiter.check(ip, buckets)
+                if not ok:
+                    return JSONResponse(
+                        status_code=429, headers={"Retry-After": str(retry)},
+                        content={"detail": f"Too many requests ({bucket}); this public demo is rate limited. "
+                                           f"Try again in {retry} s."})
+            return await call_next(request)
 
     def _store(req: Request) -> Store:
         return req.app.state.store
@@ -197,8 +242,16 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         return JSONResponse(status_code=502, content={"detail": str(exc)})
 
     @api.get("/health")
-    async def health(req: Request) -> dict[str, Any]:
-        return {"ok": True, "version": __version__, "mock": _qloo(req).mock}
+    async def health(req: Request) -> JSONResponse:
+        """Liveness for the deploy check: process up and the database answering. No Qloo call."""
+        try:
+            _store(req).count_residents("default")
+            db = True
+        except Exception:  # noqa: BLE001 - report, don't crash the probe
+            db = False
+        return JSONResponse(status_code=200 if db else 503,
+                            content={"ok": db, "db": db, "version": __version__, "mock": _qloo(req).mock,
+                                     "rate_limited": limiter is not None, "max_residents_per_home": cap})
 
     # ---- the care home (this browser's) ------------------------------------
     @api.get("/home")
@@ -225,12 +278,16 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         async with req.app.state.demo_lock:
             if req.app.state.demo is None:
                 req.app.state.demo = await resolve_demo(_qloo(req))
+        room = cap - len(existing)
+        if room < len(req.app.state.demo):
+            raise HTTPException(409, f"This home has {len(existing)} residents; the sample home needs room for "
+                                     f"{len(req.app.state.demo)} (limit {cap} per home). Remove some first.")
         created = 0
         for persona, ents in req.app.state.demo:
             for e in ents:
                 if (url := _image_url(e.properties)):
                     req.app.state.images[e.id] = url
-            store.create_resident(persona.name, [e.model_copy(update={"properties": {}}) for e in ents],
+            store.create_resident(persona.name, [e.model_copy(update={"properties": _keep_year(e)}) for e in ents],
                                   [], list(persona.needs), home_id=home)
             created += 1
         return {"home": store.set_home(home, name=DEMO_HOME, city=DEMO_CITY, demo=True), "created": created}
@@ -268,8 +325,20 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
 
     @api.post("/residents", response_model=Profile, status_code=201)
     async def create_resident(req: Request, body: ResidentIn) -> Profile:
-        ents = [EntityRef(id=e.id, name=e.name, type=_domain(e.type), tags=e.tags) for e in body.entities]
-        return _store(req).create_resident(body.name, ents, body.tags, body.needs, home_id=_home(req))
+        if _store(req).count_residents(_home(req)) >= cap:
+            raise HTTPException(409, f"This home already has {cap} residents, the limit for this demo. "
+                                     "Remove one to add another.")
+        year = _era_or_422(body.era_mode, body.era_max_year)
+        ents = [e.to_ref(_domain(e.type)) for e in body.entities]
+        return _store(req).create_resident(body.name, ents, body.tags, body.needs, home_id=_home(req),
+                                           era_mode=body.era_mode, era_max_year=year)
+
+    @api.put("/residents/{rid}/era", response_model=Profile)
+    async def set_era(req: Request, rid: str, body: EraIn) -> Profile:
+        """Film/TV era for picks and swaps (a Hearth setting, not Qloo)."""
+        _profile(req, rid)
+        _store(req).set_era(rid, body.era_mode, _era_or_422(body.era_mode, body.era_max_year))
+        return (await _with_images(req, [_profile(req, rid)]))[0]
 
     @api.get("/residents/{rid}", response_model=Profile)
     async def get_resident(req: Request, rid: str) -> Profile:
@@ -326,8 +395,7 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
     @api.post("/feedback", response_model=Profile)
     async def feedback(req: Request, body: FeedbackIn) -> Profile:
         prof = _profile(req, body.resident_id)
-        ent = EntityRef(id=body.entity.id, name=body.entity.name, type=_domain(body.entity.type),
-                        tags=body.entity.tags)
+        ent = body.entity.to_ref(_domain(body.entity.type))
         updated = apply_feedback(prof, ent, body.enjoyed)
         _store(req).save_profile(updated)
         _store(req).log_feedback(body.resident_id, ent.id, body.enjoyed)
@@ -347,7 +415,7 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         if (dist / "assets").is_dir():
             app.mount("/assets", StaticFiles(directory=dist / "assets"), name="assets")
 
-        @app.get("/{path:path}", include_in_schema=False)
+        @app.api_route("/{path:path}", methods=["GET", "HEAD"], include_in_schema=False)
         async def spa(path: str):
             if path.startswith("api/"):
                 raise HTTPException(404, "not found")

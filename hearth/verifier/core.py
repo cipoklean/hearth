@@ -19,6 +19,7 @@ import difflib
 from dataclasses import dataclass, field
 from typing import Callable, Iterable, Mapping
 
+from ..era import filter_notes, out_of_era, ranked_filters
 from ..models import EntityRef, Profile, Tag
 from ..qloo import QlooClient
 from ..qloo.params import DOMAINS, normalize_type
@@ -264,13 +265,15 @@ async def top_for(client: QlooClient, profile: Profile, etype: str, *, take: int
 
 
 def pick_swap(ranked: list[EntityRef], current_aff: float, best: float, profile: Profile,
-              exclude: set[str], swap_filter: SwapFilter | None) -> Swap | None:
+              exclude: set[str], swap_filter: SwapFilter | None, *, require_better: bool = True) -> Swap | None:
     for e in ranked:
         if e.id in exclude:
             continue
         a = affinity_of(e)
-        if a <= current_aff:
+        if require_better and a <= current_aff:
             break
+        if out_of_era(e, profile) is not None:
+            continue  # ranked lists are era-filtered by Qloo; this guards unfiltered callers
         if swap_filter and not swap_filter(e):
             continue
         tags = shared_tags(e, profile)
@@ -311,14 +314,18 @@ def _unresolved(cand: Candidate, res: Resolution, profile: Profile) -> CheckResu
 
 
 def _scored(cand: Candidate, res: Resolution, ent: EntityRef | None, ranked: list[EntityRef], profile: Profile,
-            th: Thresholds, swap_filter: SwapFilter | None) -> CheckResult:
+            th: Thresholds, swap_filter: SwapFilter | None, swap_ranked: list[EntityRef] | None = None,
+            notes: list[str] | None = None) -> CheckResult:
     if ent is None:
         res.reason = "Qloo returned no affinity for this entity"
         return CheckResult(candidate=cand, resolution=res, verdict=Verdict.cannot_verify)
     if res.entity is not None and res.entity.properties.get("popularity") is not None:
         ent.properties.setdefault("popularity", res.entity.properties["popularity"])
     res.entity = ent  # now carries Qloo tags/properties
-    return assess(cand, res, ent, ranked, profile, th=th, swap_filter=swap_filter)
+    if swap_ranked is None:
+        return assess(cand, res, ent, ranked, profile, th=th, swap_filter=swap_filter, notes=notes)
+    return assess(cand, res, ent, swap_ranked, profile, th=th, swap_filter=swap_filter, best_ranked=ranked,
+                  notes=notes)
 
 
 async def check_one(client: QlooClient, profile: Profile, cand: Candidate, *,
@@ -340,10 +347,17 @@ async def check_one(client: QlooClient, profile: Profile, cand: Candidate, *,
 
 
 def assess(cand: Candidate, res: Resolution, ent: EntityRef, ranked: list[EntityRef], profile: Profile,
-           *, th: Thresholds = DEFAULT, swap_filter: SwapFilter | None = None) -> CheckResult:
-    """Pure: verdict, evidence and swap for an entity Qloo has already scored."""
+           *, th: Thresholds = DEFAULT, swap_filter: SwapFilter | None = None,
+           best_ranked: list[EntityRef] | None = None, notes: Iterable[str] = ()) -> CheckResult:
+    """Pure: verdict, evidence and swap for an entity Qloo has already scored.
+
+    ``ranked`` is where the swap comes from. ``best_ranked`` (default: ``ranked``) sets "best
+    available" for relative fit; pass the unfiltered list when ``ranked`` was narrowed by a Hearth
+    filter (era, gentle ratings) so the calibrated thresholds keep their meaning.
+    """
     aff = affinity_of(ent)
-    best = max([aff, *(affinity_of(e) for e in ranked)])
+    pool = ranked if best_ranked is None else [*best_ranked, *ranked]
+    best = max([aff, *(affinity_of(e) for e in pool)])
     rel = relative_fit(aff, best)
     t = th.for_type(ent.type)
     contribs = signal_contributions(ent, profile)
@@ -351,6 +365,9 @@ def assess(cand: Candidate, res: Resolution, ent: EntityRef, ranked: list[Entity
                   shared_tags=shared_tags(ent, profile), signal_contributions=contribs,
                   threshold_status=t.status)
     verdict = classify(rel, th, affinity=aff, etype=ent.type)
+    ev.notes.extend(notes)
+    if (late := out_of_era(ent, profile)) is not None:
+        ev.notes.append(late[0].upper() + late[1:])
     if t.status != "calibrated":
         ev.notes.append(f"verdict thresholds for {ent.type.rsplit(':', 1)[-1]} are {t.status}; treat as a hint")
     if verdict is not Verdict.poor and (lead := leading_favourite(contribs)):
@@ -363,19 +380,27 @@ def assess(cand: Candidate, res: Resolution, ent: EntityRef, ranked: list[Entity
         if verdict is Verdict.good:
             verdict = Verdict.weak
     swap = None
-    if verdict is not Verdict.good:
-        swap = pick_swap(ranked, aff, best, profile, {ent.id, *profile.disliked}, swap_filter)
+    if verdict is not Verdict.good or late is not None:
+        # An out-of-era pick gets the best in-era alternative even when Qloo scores it lower.
+        swap = pick_swap(ranked, aff, best, profile, {ent.id, *profile.disliked}, swap_filter,
+                         require_better=late is None)
+        if swap is not None and late is not None and (era := profile.era) is not None:
+            swap.reason += f"; within their era (up to {era.max_year})"
     return CheckResult(candidate=cand, resolution=res, verdict=verdict, evidence=ev, swap=swap)
 
 
 async def verify(client: QlooClient, profile: Profile, candidates: list[Candidate], *,
                  th: Thresholds = DEFAULT, swap_filter: SwapFilter | None = None,
-                 ranked_take: int = 20, ranked_extra: Mapping[str, dict] | None = None) -> VerifyReport:
+                 ranked_take: int = 20, ranked_extra: Mapping[str, dict] | None = None,
+                 hearth_filters: bool = True) -> VerifyReport:
     """Resolve every candidate, then score per domain in batch: one ranked-list call and one
     filter.results.entities call per domain, however many candidates there are.
 
     ``ranked_extra`` adds per-domain filters to the ranked list that sets "best available" and the
     swaps, e.g. {"place": {"filter.location.query": "London"}} so outings are compared locally.
+
+    ``hearth_filters``: for film/TV, swaps come from a second ranked list narrowed to the person's
+    era and (mild_content) gentle ratings; "best available" stays unfiltered (see ``assess``).
     """
     extras = {domain_to_type(k): v for k, v in (ranked_extra or {}).items()}
     results: list[CheckResult | None] = [None] * len(candidates)
@@ -392,10 +417,17 @@ async def verify(client: QlooClient, profile: Profile, candidates: list[Candidat
         pending.setdefault(pre, []).append((i, res))
     for etype, items in pending.items():
         ranked = await top_for(client, profile, etype, take=ranked_take, extra=extras.get(etype))
+        hf = ranked_filters(profile, etype) if hearth_filters else {}
+        swap_ranked = None
+        if hf:
+            swap_ranked = await top_for(client, profile, etype, take=ranked_take,
+                                        extra={**(extras.get(etype) or {}), **hf})
+        notes = filter_notes(profile, etype) if hf else []
         scored = await score_entities(client, profile, etype, [r.entity.id for _, r in items if r.entity])
         for i, res in items:
             assert res.entity is not None
-            results[i] = _scored(candidates[i], res, scored.get(res.entity.id), ranked, profile, th, swap_filter)
+            results[i] = _scored(candidates[i], res, scored.get(res.entity.id), ranked, profile, th, swap_filter,
+                                 swap_ranked=swap_ranked, notes=notes)
     done = [r for r in results if r is not None]
     counts: dict[str, int] = {}
     for r in done:
