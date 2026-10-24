@@ -26,3 +26,12 @@ venv/
 .ruff_cache/
 .coverage
 htmlcov/
+
+# Web app (build output and deps; rebuild with `cd web && npm ci && npm run build`)
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo
+*.tsbuildinfo
+
+# Local screenshots
+screenshots/

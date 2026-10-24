@@ -48,3 +48,18 @@ def test_dishes():
     jollof = next(d for d in dish_library() if d.name.startswith("Jollof"))
     assert not passes(check_dish(jollof, [Need.soft_food]))
     assert dishes_for("unknown_cuisine", []) == []
+
+
+def test_place_tags_inform_care_rules():
+    from hearth.constraints import check_entity
+    from hearth.models import EntityRef, Need, Tag
+    museum = EntityRef(id="p1", name="A Crime Museum", type="urn:entity:place", tags=[
+        Tag(id="urn:tag:ambience:qloo:creepy"), Tag(id="urn:tag:accessibility:place:wheelchair_accessible_entrance")])
+    res = {r.need: r for r in check_entity(museum, [Need.mild_content, Need.wheelchair_access])}
+    assert res[Need.mild_content].outcome.value == "fail"
+    assert res[Need.wheelchair_access].outcome.value == "pass"
+    # staff-entered facts still win over venue tags
+    res = {r.need: r for r in check_entity(museum, [Need.wheelchair_access], {"step_free": False})}
+    assert res[Need.wheelchair_access].outcome.value == "fail"
+    garden = EntityRef(id="p2", name="Garden", type="urn:entity:place", tags=[Tag(id="urn:tag:category:place:garden")])
+    assert check_entity(garden, [Need.mild_content]) == []

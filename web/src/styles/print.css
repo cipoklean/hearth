@@ -1,0 +1,40 @@
+/* Print: three clean A4 sheets (weekly schedule, menu card, playlist). Everything else hidden. */
+.print-only { display: none; }
+
+@page { size: A4; margin: 16mm 15mm; }
+
+@media print {
+  html { font-size: 11pt; }
+  body { background: #fff !important; color: #000; }
+  body::before { display: none; }
+  .no-print, .masthead, .mockline, .toasts, .tour, .skip { display: none !important; }
+  .page { padding: 0; max-width: none; }
+  .print-only { display: block; }
+
+  .sheet { break-after: page; page-break-after: always; font-family: var(--sans); }
+  .sheet:last-child { break-after: auto; page-break-after: auto; }
+  .sheet__head { border-bottom: 2pt solid #000; padding-bottom: 6pt; margin-bottom: 12pt; }
+  .sheet__head--center { text-align: center; }
+  .sheet__brand { display: block; font-size: 9pt; letter-spacing: 0.14em; text-transform: uppercase; color: #8a2f10; font-weight: 700; }
+  .sheet h1 { font-family: var(--display); font-size: 26pt; margin: 2pt 0 4pt; }
+  .sheet__head p { margin: 0; font-size: 11pt; }
+  .sheet__table { width: 100%; border-collapse: collapse; font-size: 10.5pt; }
+  .sheet__table th { text-align: left; font-size: 8.5pt; letter-spacing: 0.1em; text-transform: uppercase; border-bottom: 1pt solid #000; padding: 4pt 6pt; }
+  .sheet__table td { border-bottom: 0.5pt solid #bbb; padding: 7pt 6pt; vertical-align: top; }
+  .sheet__table td:first-child { font-family: var(--display); font-weight: 700; white-space: nowrap; }
+  .sheet__table td:nth-child(4) { white-space: nowrap; font-weight: 700; }
+  .sheet__table td:last-child { font-size: 9pt; color: #333; }
+  .sheet__foot { margin-top: 14pt; font-size: 9pt; color: #444; }
+  .muted { color: #555; }
+
+  .sheet--menu { text-align: center; border: 1.5pt solid #000; padding: 18pt 24pt; outline: 0.5pt solid #000; outline-offset: -6pt; }
+  .menu-course { margin: 16pt 0; }
+  .menu-course h2 { font-family: var(--display); font-size: 15pt; font-weight: 600; margin: 0 0 6pt; text-transform: none; }
+  .menu-course h2::after { content: "~"; display: block; color: #8a2f10; font-size: 12pt; }
+  .menu-course ul { list-style: none; margin: 0; padding: 0; font-family: var(--display); font-style: italic; font-size: 13pt; line-height: 1.7; }
+
+  .playlist { counter-reset: n; list-style: none; padding: 0; margin: 0; font-size: 13pt; }
+  .playlist li { counter-increment: n; display: flex; gap: 10pt; align-items: baseline; padding: 8pt 0; border-bottom: 0.5pt dotted #999; }
+  .playlist li::before { content: counter(n, decimal-leading-zero); font-family: var(--display); font-weight: 700; color: #8a2f10; width: 22pt; }
+  .playlist li span { margin-left: auto; font-size: 9pt; letter-spacing: 0.08em; text-transform: uppercase; color: #555; }
+}

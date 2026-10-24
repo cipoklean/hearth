@@ -30,6 +30,10 @@ MILD_RATINGS = {"G", "PG", "TV-G", "TV-PG", "TV-Y", "TV-Y7", "U", "Approved", "P
 STRONG_RATINGS = {"R", "NC-17", "TV-MA", "18+"}
 INTENSE_TAG_KEYS = ("horror", "war", "thriller", "slasher")
 LOUD_TAG_KEYS = ("nightclub", "heavy_metal", "punk", "rave")
+# Venue tags (live Qloo place tags, e.g. urn:tag:ambience:qloo:creepy) that make an outing unsuitable
+# for someone who needs gentle content.
+DARK_PLACE_KEYS = ("true_crime", "creepy", "grim", "horror", "haunted", "dungeon", "macabre", "torture")
+STEP_FREE_KEYS = ("wheelchair_accessible_entrance",)
 FOOD_NEEDS = {Need.soft_food, Need.low_salt, Need.low_sugar, Need.vegetarian}
 
 
@@ -61,8 +65,35 @@ def dish_library() -> list[Dish]:
     return [Dish(**d) for d in raw["dishes"]]
 
 
+# Qloo restaurant tags are fine-grained (and in big cities often venue types like "cafe" or
+# "gastropub"); Hearth maps them onto the cuisines its menu library covers. Unmapped keys
+# (bars, food courts...) have no dishes and are skipped by the planner.
+CUISINE_ALIASES = {
+    "tea_house": "tea_room", "tea_and_coffee_shop": "tea_room", "cafe": "tea_room", "coffee_shop": "tea_room",
+    "cake_shop": "tea_room", "bakery": "tea_room", "art_cafe": "tea_room", "breakfast": "tea_room",
+    "sandwich_shop": "tea_room", "brunch": "tea_room",
+    "gastropub": "british", "english": "british", "pub": "british", "fish_and_chips": "british",
+    "modern_british": "british", "scottish": "british", "irish": "british",
+    "fine_dining": "modern_european", "european": "modern_european", "brasserie": "french",
+    "bistro": "french", "haute_french": "french", "pizza": "italian", "trattoria": "italian",
+    "tapas": "spanish", "dim_sum": "chinese", "cantonese": "chinese", "sichuan": "chinese",
+    "curry": "indian", "north_indian": "indian", "south_indian": "indian",
+    "hamburger": "american", "steakhouse": "american", "diner": "american", "southern": "american",
+    "greek": "mediterranean", "middle_eastern": "mediterranean", "lebanese": "mediterranean",
+    "nigerian": "west_african", "ghanaian": "west_african", "jamaican": "caribbean",
+    "fish": "seafood", "oyster_bar": "seafood",
+}
+CUISINE_NAMES = {
+    "tea_room": "Afternoon tea", "british": "British classics", "modern_european": "Modern European",
+    "french": "French bistro", "italian": "Italian", "spanish": "Spanish", "chinese": "Cantonese",
+    "indian": "Indian", "american": "American diner", "mediterranean": "Mediterranean",
+    "west_african": "West African", "caribbean": "Caribbean", "seafood": "Seaside",
+}
+
+
 def cuisine_key(tag_id: str) -> str:
-    return tag_id.rsplit(":", 1)[-1]
+    k = tag_id.rsplit(":", 1)[-1]
+    return CUISINE_ALIASES.get(k, k)
 
 
 def _tag_keys(e: EntityRef) -> set[str]:
@@ -94,7 +125,9 @@ def check_entity(e: EntityRef, needs: Iterable[Need], facts: Mapping[str, Any] |
     for n in needs:
         if n is Need.wheelchair_access and kind in {"place", "destination"}:
             v = facts.get("step_free")
-            if v is None:
+            if v is None and keys & set(STEP_FREE_KEYS):
+                out.append(_r(n, Outcome.pass_, "wheelchair-accessible entrance listed in venue data"))
+            elif v is None:
                 out.append(_r(n, Outcome.unknown, "step-free access not recorded; staff to confirm"))
             else:
                 out.append(_r(n, Outcome.pass_ if v else Outcome.fail,
@@ -121,12 +154,20 @@ def check_entity(e: EntityRef, needs: Iterable[Need], facts: Mapping[str, Any] |
                               f"{int(float(mins))} min ({'within' if ok else 'over'} {SHORT_FILM_MINUTES})"))
         elif n is Need.mild_content and kind in {"movie", "tv_show"}:
             rating = str(e.properties.get("content_rating") or facts.get("content_rating") or "")
-            if keys & set(INTENSE_TAG_KEYS) or rating in STRONG_RATINGS:
-                out.append(_r(n, Outcome.fail, f"intense content ({rating or 'by genre'})"))
+            intense = sorted(keys & set(INTENSE_TAG_KEYS))
+            if rating in STRONG_RATINGS:
+                out.append(_r(n, Outcome.fail, f"rated {rating}"))
+            elif intense:
+                out.append(_r(n, Outcome.fail, f"{intense[0]} genre"
+                              + (f", although rated {rating}" if rating else "")))
             elif rating in MILD_RATINGS:
                 out.append(_r(n, Outcome.pass_, f"rated {rating}"))
             else:
                 out.append(_r(n, Outcome.unknown, f"rating {rating or 'unknown'}; staff to preview"))
+        elif n is Need.mild_content and kind in {"place", "destination"}:
+            dark = sorted(keys & set(DARK_PLACE_KEYS))
+            if dark:
+                out.append(_r(n, Outcome.fail, f"dark theme ({dark[0].replace('_', ' ')})"))
         elif n is Need.hearing_support and kind in {"movie", "tv_show"}:
             v = facts.get("subtitles")
             out.append(_r(n, Outcome.pass_ if v else Outcome.unknown,

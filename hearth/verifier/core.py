@@ -136,9 +136,34 @@ def _label(e: EntityRef) -> str:
     return f"{e.name}, {year}" if year else e.name
 
 
+# Display order for evidence tags: genre/style words first, audience adjectives ("Loyal",
+# "Diverse") and noisy keyword tags last. Matched on the tag id's category segment.
+_TAG_RANK = ("genre", "subgenre", "style", "influence", "category", "music", "theme", "plot",
+             "setting", "ambience", "activity_type", "instrument", "interests", "archetype", "character",
+             "artist", "characteristic", "keyword", "audience")
+_TAG_DROP = ("obscurity", "time_of_day_fit")
+
+
+def _tag_rank(tag_id: str) -> int:
+    parts = tag_id.split(":")
+    cat = parts[2] if len(parts) > 2 else ""
+    return _TAG_RANK.index(cat) if cat in _TAG_RANK else len(_TAG_RANK)
+
+
 def shared_tags(entity: EntityRef, profile: Profile) -> list[Tag]:
+    """Tags this entity shares with the person's favourites, genre/style tags first."""
     known = profile.known_tags()
-    return [Tag(id=t.id, name=t.name or known.get(t.id, t.id)) for t in entity.tags if t.id in known]
+    out, seen = [], set()
+    for t in entity.tags:
+        if t.id not in known or any(f":{d}:" in t.id for d in _TAG_DROP):
+            continue
+        name = t.name or known.get(t.id, t.id)
+        if name.lower() in seen:
+            continue
+        seen.add(name.lower())
+        out.append(Tag(id=t.id, name=name))
+    out.sort(key=lambda t: _tag_rank(t.id))  # stable: keeps Qloo's order within a rank
+    return out
 
 
 def relative_fit(affinity: float, best: float) -> float:

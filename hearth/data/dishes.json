@@ -1,31 +1,437 @@
 {
-  "_notice": "Hearth's own starter menu library (authored for Hearth, not Qloo data). Attributes are kitchen guidance only; a dietitian should review before real use. cuisine keys match the last segment of a Qloo cuisine tag id.",
-  "dishes": [
-    {"name": "Minestrone soup", "cuisine": "italian", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": true},
-    {"name": "Soft polenta with tomato sauce", "cuisine": "italian", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": true},
-    {"name": "Baked salmon with mash", "cuisine": "italian", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": false},
-    {"name": "Lasagne", "cuisine": "italian", "soft": true, "low_salt": false, "low_sugar": true, "vegetarian": false},
-    {"name": "Tiramisu", "cuisine": "italian", "soft": true, "low_salt": true, "low_sugar": false, "vegetarian": true},
-
-    {"name": "Light pepper soup with fish", "cuisine": "west_african", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": false},
-    {"name": "Moi moi (steamed bean pudding)", "cuisine": "west_african", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": true},
-    {"name": "Jollof rice with chicken", "cuisine": "west_african", "soft": false, "low_salt": false, "low_sugar": true, "vegetarian": false},
-    {"name": "Yam porridge (asaro)", "cuisine": "west_african", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": true},
-
-    {"name": "Pumpkin soup", "cuisine": "caribbean", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": true},
-    {"name": "Steamed fish with soft rice", "cuisine": "caribbean", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": false},
-    {"name": "Jerk chicken", "cuisine": "caribbean", "soft": false, "low_salt": false, "low_sugar": true, "vegetarian": false},
-
-    {"name": "Cottage pie", "cuisine": "british", "soft": true, "low_salt": false, "low_sugar": true, "vegetarian": false},
-    {"name": "Fish pie", "cuisine": "british", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": false},
-    {"name": "Leek and potato soup", "cuisine": "british", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": true},
-    {"name": "Rice pudding", "cuisine": "british", "soft": true, "low_salt": true, "low_sugar": false, "vegetarian": true},
-
-    {"name": "Finger sandwiches (crusts off)", "cuisine": "tea_room", "soft": true, "low_salt": false, "low_sugar": true, "vegetarian": true},
-    {"name": "Scones with cream", "cuisine": "tea_room", "soft": true, "low_salt": true, "low_sugar": false, "vegetarian": true},
-    {"name": "Egg custard", "cuisine": "tea_room", "soft": true, "low_salt": true, "low_sugar": false, "vegetarian": true},
-
-    {"name": "Poached cod with parsley sauce", "cuisine": "seafood", "soft": true, "low_salt": true, "low_sugar": true, "vegetarian": false},
-    {"name": "Fish chowder", "cuisine": "seafood", "soft": true, "low_salt": false, "low_sugar": true, "vegetarian": false}
-  ]
+ "_notice": "Hearth's own starter menu library (authored for Hearth, not Qloo data). Attributes are kitchen guidance only; a dietitian should review before real use. cuisine keys match the last segment of a Qloo cuisine tag id.",
+ "dishes": [
+  {
+   "name": "Minestrone soup",
+   "cuisine": "italian",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Soft polenta with tomato sauce",
+   "cuisine": "italian",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Baked salmon with mash",
+   "cuisine": "italian",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Lasagne",
+   "cuisine": "italian",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Tiramisu",
+   "cuisine": "italian",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Light pepper soup with fish",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Moi moi (steamed bean pudding)",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Jollof rice with chicken",
+   "cuisine": "west_african",
+   "soft": false,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Yam porridge (asaro)",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Pumpkin soup",
+   "cuisine": "caribbean",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Steamed fish with soft rice",
+   "cuisine": "caribbean",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Jerk chicken",
+   "cuisine": "caribbean",
+   "soft": false,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Cottage pie",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Fish pie",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Leek and potato soup",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Rice pudding",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Finger sandwiches (crusts off)",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Scones with cream",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Egg custard",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Poached cod with parsley sauce",
+   "cuisine": "seafood",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Fish chowder",
+   "cuisine": "seafood",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Cream of tomato soup",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Egg mayonnaise sandwiches (soft bread)",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Smoked salmon and cucumber sandwiches",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Stewed apple with custard",
+   "cuisine": "tea_room",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Shepherd's pie",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Cauliflower cheese",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Braised beef with soft vegetables",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Mushroom and leek pie filling with mash",
+   "cuisine": "british",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Chicken fricassee with herbs",
+   "cuisine": "modern_european",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Wild mushroom risotto",
+   "cuisine": "modern_european",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Baked cod with crushed potatoes",
+   "cuisine": "modern_european",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Vegetable gratin",
+   "cuisine": "modern_european",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "French onion soup",
+   "cuisine": "french",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Chicken chasseur",
+   "cuisine": "french",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Ratatouille with soft potatoes",
+   "cuisine": "french",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Creme caramel",
+   "cuisine": "french",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Gazpacho",
+   "cuisine": "spanish",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Spanish omelette (tortilla)",
+   "cuisine": "spanish",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Chicken and rice (arroz con pollo)",
+   "cuisine": "spanish",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Steamed fish with ginger",
+   "cuisine": "chinese",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Congee with spring onion",
+   "cuisine": "chinese",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Steamed egg custard (savoury)",
+   "cuisine": "chinese",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Sweet and sour chicken",
+   "cuisine": "chinese",
+   "soft": false,
+   "low_salt": false,
+   "low_sugar": false,
+   "vegetarian": false
+  },
+  {
+   "name": "Mild chicken korma with rice",
+   "cuisine": "indian",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Dal (lentil curry)",
+   "cuisine": "indian",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Vegetable biryani",
+   "cuisine": "indian",
+   "soft": false,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Meatloaf with mashed potatoes",
+   "cuisine": "american",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Macaroni cheese",
+   "cuisine": "american",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Chicken and corn chowder",
+   "cuisine": "american",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Baked fish with lemon",
+   "cuisine": "mediterranean",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Hummus with soft flatbread",
+   "cuisine": "mediterranean",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Lentil soup",
+   "cuisine": "mediterranean",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Fish cakes with peas",
+   "cuisine": "seafood",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": false
+  }
+ ]
 }

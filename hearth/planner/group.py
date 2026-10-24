@@ -78,7 +78,8 @@ def _pk(p: Profile) -> str:
 async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *,
                      candidates: list[Candidate] | None = None,
                      facts: Mapping[str, Mapping[str, Any]] | None = None,
-                     per_person: int = 5, th: Thresholds = DEFAULT_THRESHOLDS) -> GroupPick:
+                     per_person: int = 5, th: Thresholds = DEFAULT_THRESHOLDS,
+                     place_extra: dict | None = None) -> GroupPick:
     if not profiles:
         raise ValueError("group_pick needs at least one resident")
     facts = facts or {}
@@ -87,7 +88,8 @@ async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *
 
     tops: dict[str, list[EntityRef]] = {}
     for p in profiles:
-        tops[_pk(p)] = await top_for(client, p, etype, take=max(per_person, 10))
+        extra = place_extra if etype == "urn:entity:place" else None
+        tops[_pk(p)] = await top_for(client, p, etype, take=max(per_person, 20), extra=extra)
 
     pool: dict[str, EntityRef] = {}
     if candidates:

@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS feedback (
   enjoyed INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+CREATE TABLE IF NOT EXISTS homes (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL DEFAULT '',
+  city TEXT NOT NULL DEFAULT '',
+  demo INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS venue_facts (
   entity_id TEXT PRIMARY KEY,
   facts TEXT NOT NULL DEFAULT '{}'
@@ -58,6 +64,10 @@ class Store:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys = ON")
         self._conn.executescript(SCHEMA)
+        cols = {r["name"] for r in self._conn.execute("PRAGMA table_info(residents)")}
+        if "home_id" not in cols:  # older DBs: one implicit home
+            self._conn.execute("ALTER TABLE residents ADD COLUMN home_id TEXT NOT NULL DEFAULT 'default'")
+            self._conn.commit()
         self._lock = threading.Lock()
 
     def close(self) -> None:
@@ -65,11 +75,11 @@ class Store:
 
     # ---- residents -----------------------------------------------------------
     def create_resident(self, name: str, entities: list[EntityRef], tags: list[Tag],
-                        needs: list[Need]) -> Profile:
+                        needs: list[Need], home_id: str = "default") -> Profile:
         rid = uuid.uuid4().hex[:12]
         with self._lock, self._conn:
-            self._conn.execute("INSERT INTO residents (id, name, needs) VALUES (?, ?, ?)",
-                               (rid, name, json.dumps([n.value for n in needs])))
+            self._conn.execute("INSERT INTO residents (id, name, needs, home_id) VALUES (?, ?, ?, ?)",
+                               (rid, name, json.dumps([n.value for n in needs]), home_id))
             for e in entities:
                 self._upsert_entity(rid, e, e.weight, False)
             for t in tags:
@@ -85,6 +95,57 @@ class Store:
             "INSERT OR REPLACE INTO resident_entities (resident_id, entity_id, name, type, tags, weight, disliked)"
             " VALUES (?,?,?,?,?,?,?)",
             (rid, e.id, e.name, e.type, json.dumps([t.model_dump() for t in e.tags]), weight, int(disliked)))
+
+    def home_of(self, rid: str) -> str | None:
+        row = self._conn.execute("SELECT home_id FROM residents WHERE id = ?", (rid,)).fetchone()
+        return row["home_id"] if row else None
+
+    def list_residents(self, home_id: str = "default") -> list[Profile]:
+        rows = self._conn.execute("SELECT id FROM residents WHERE home_id = ? ORDER BY rowid", (home_id,))
+        return [p for r in rows.fetchall() if (p := self.get_profile(r["id"])) is not None]
+
+    def delete_resident(self, rid: str) -> bool:
+        """Remove a resident and everything stored about them (favourites, tags, feedback)."""
+        with self._lock, self._conn:
+            cur = self._conn.execute("DELETE FROM residents WHERE id = ?", (rid,))
+            # explicit, in case foreign keys were off when rows were written
+            for t in ("resident_entities", "resident_tags", "feedback"):
+                self._conn.execute(f"DELETE FROM {t} WHERE resident_id = ?", (rid,))
+        return cur.rowcount > 0
+
+    def history(self, rid: str) -> list[dict[str, Any]]:
+        """Feedback log, newest first, with the entity name kept in the profile."""
+        q = ("SELECT f.entity_id, f.enjoyed, f.created_at, e.name, e.type FROM feedback f "
+             "LEFT JOIN resident_entities e ON e.resident_id = f.resident_id AND e.entity_id = f.entity_id "
+             "WHERE f.resident_id = ? ORDER BY f.id DESC LIMIT 50")
+        return [{"entity_id": r["entity_id"], "name": r["name"] or "", "type": r["type"] or "",
+                 "enjoyed": bool(r["enjoyed"]), "created_at": r["created_at"]}
+                for r in self._conn.execute(q, (rid,))]
+
+    # ---- homes (a name and town per browser; no personal data) ---------------
+    def get_home(self, home_id: str) -> dict[str, Any]:
+        row = self._conn.execute("SELECT * FROM homes WHERE id = ?", (home_id,)).fetchone()
+        if row is None:
+            return {"id": home_id, "name": "", "city": "", "demo": False}
+        return {"id": row["id"], "name": row["name"], "city": row["city"], "demo": bool(row["demo"])}
+
+    def set_home(self, home_id: str, name: str | None = None, city: str | None = None,
+                 demo: bool | None = None) -> dict[str, Any]:
+        cur = self.get_home(home_id)
+        new = {"name": cur["name"] if name is None else name, "city": cur["city"] if city is None else city,
+               "demo": cur["demo"] if demo is None else demo}
+        with self._lock, self._conn:
+            self._conn.execute("INSERT OR REPLACE INTO homes (id, name, city, demo) VALUES (?,?,?,?)",
+                               (home_id, new["name"], new["city"], int(new["demo"])))
+        return self.get_home(home_id)
+
+    def delete_home(self, home_id: str) -> int:
+        ids = [r["id"] for r in self._conn.execute("SELECT id FROM residents WHERE home_id = ?", (home_id,))]
+        for rid in ids:
+            self.delete_resident(rid)
+        with self._lock, self._conn:
+            self._conn.execute("DELETE FROM homes WHERE id = ?", (home_id,))
+        return len(ids)
 
     def get_profile(self, rid: str) -> Profile | None:
         row = self._conn.execute("SELECT * FROM residents WHERE id = ?", (rid,)).fetchone()
