@@ -57,5 +57,5 @@ def test_choose_prefers_more_people_covered():
     a, b = Profile(resident_id="a"), Profile(resident_id="b")
     x = EntityRef(id="x", name="X", type="urn:entity:movie")
     y = EntityRef(id="y", name="Y", type="urn:entity:movie")
-    rel = {"a": {"x": 1.0, "y": 0.6}, "b": {"x": 0.1, "y": 0.6}}
+    rel = {"a": {"x": 1.0, "y": 0.9}, "b": {"x": 0.1, "y": 0.9}}
     assert choose([x, y], rel, [a, b]).id == "y"

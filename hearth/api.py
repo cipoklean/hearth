@@ -39,6 +39,8 @@ class VerifyIn(BaseModel):
     resident_id: str | None = None
     profile: Profile | None = None
     candidates: list[Candidate] = Field(min_length=1, max_length=25)
+    # Place picks are compared with what Qloo ranks for this person in this locality (e.g. "London").
+    place_location: str | None = Field(default=None, max_length=100)
 
 
 class GroupPickIn(BaseModel):
@@ -137,7 +139,8 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None) -> 
         for c in body.candidates:
             _domain(c.domain)
         swap_ok = entity_filter(prof.needs, _store(req).all_facts()) if prof.needs else None
-        return await verify(_qloo(req), prof, body.candidates, swap_filter=swap_ok)
+        extra = {"place": {"filter.location.query": body.place_location}} if body.place_location else None
+        return await verify(_qloo(req), prof, body.candidates, swap_filter=swap_ok, ranked_extra=extra)
 
     @app.get("/residents/{rid}/plan", response_model=WeeklyPlan)
     async def plan(req: Request, rid: str) -> WeeklyPlan:

@@ -42,6 +42,8 @@ DOMAINS: dict[str, str] = {t.rsplit(":", 1)[1]: t for t in ENTITY_TYPES}
 _COMMON = frozenset({
     "filter.type",
     "bias.trends",
+    # Live API (2026-10-24): returns query.explainability per result; does not change affinity.
+    "feature.explainability",
     "filter.exclude.entities",
     "filter.exclude.tags",
     "operator.exclude.tags",
@@ -70,6 +72,7 @@ _GEO = frozenset({
     "filter.geocode.admin2_region",
     "filter.geocode.country_code",
     "filter.location",
+    "filter.location.query",   # live API 2026-10-24: place + "London" works (named locality)
     "filter.location.radius",
     "filter.location.geohash",
     "filter.exclude.location.geohash",

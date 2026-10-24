@@ -39,11 +39,20 @@ class Verdict(str, Enum):
     cannot_verify = "cannot_verify"
 
 
+class SignalContribution(BaseModel):
+    """Qloo explainability: this favourite's share of the entity's affinity (shares sum to ~1)."""
+    entity_id: str
+    name: str = ""
+    share: float
+
+
 class Evidence(BaseModel):
     qloo_affinity: float | None = None          # Qloo insights affinity for this entity
     best_available_affinity: float | None = None  # top affinity Qloo returns for this profile+type
     relative_fit: float | None = None            # qloo_affinity / best_available (Hearth calc)
     shared_tags: list[Tag] = Field(default_factory=list)
+    signal_contributions: list[SignalContribution] = Field(default_factory=list)  # Qloo explainability
+    threshold_status: str = ""  # calibrated | provisional | uncalibrated (Hearth)
     notes: list[str] = Field(default_factory=list)
 
 

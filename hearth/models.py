@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class Tag(BaseModel):
     id: str
     name: str = ""
+    type: str = ""  # e.g. urn:tag:genre:music (Qloo); empty when unknown
     weight: float = 1.0
 
 

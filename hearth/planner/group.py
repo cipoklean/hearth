@@ -17,7 +17,7 @@ from pydantic import BaseModel, Field
 from ..constraints import check_entity, passes
 from ..models import EntityRef, Profile, Tag
 from ..qloo import QlooClient
-from ..verifier import (DEFAULT_THRESHOLDS, Candidate, Resolution, ResolutionStatus, Thresholds,
+from ..verifier import (DEFAULT_THRESHOLDS, Candidate, Resolution, ResolutionStatus, Thresholds, Verdict,
                         classify, domain_to_type, relative_fit, resolve, score_entities,
                         shared_tags, top_for)
 from ..verifier.core import affinity_of
@@ -61,7 +61,8 @@ def choose(pool: list[EntityRef], rel: dict[str, dict[str, float]], profiles: li
     """Pure: pick the pool item with the best group objective. rel[profile_key][entity_id]."""
     def key(e: EntityRef):
         fits = [rel[_pk(p)].get(e.id, 0.0) for p in profiles]
-        n_ok = sum(f >= th.weak for f in fits)
+        weak = th.for_type(e.type).weak
+        n_ok = sum(f >= weak for f in fits)
         return (n_ok, sum(fits) / len(fits), min(fits), _neg(e.id))
     return max(pool, key=key) if pool else None
 
@@ -134,9 +135,9 @@ async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *
         k = _pk(p)
         f = rel[k].get(pick.id, 0.0)
         out.fits.append(ResidentFit(resident_id=p.resident_id, name=p.name, relative_fit=f,
-                                    qloo_affinity=aff[k].get(pick.id, 0.0), verdict=classify(f, th).value,
+                                    qloo_affinity=aff[k].get(pick.id, 0.0), verdict=classify(f, th, affinity=aff[k].get(pick.id), etype=etype).value,
                                     shared_tags=shared_tags(pick, p)))
-        if f < th.weak:
+        if classify(f, th, affinity=aff[k].get(pick.id), etype=etype) is Verdict.poor:
             alt, alt_fit = None, None
             for e in tops[k]:
                 if e.id == pick.id or e.id in p.disliked:
@@ -146,6 +147,6 @@ async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *
                     break
             out.left_out.append(LeftOut(
                 resident_id=p.resident_id, name=p.name, relative_fit=f, alternative=alt, alternative_fit=alt_fit,
-                reason=f"{pick.name} is a {classify(f, th).value} fit for {p.name}"
+                reason=f"{pick.name} is a poor fit for {p.name}"
                        + (f"; offer {alt.name} as a 1:1 or small-group alternative" if alt else "")))
     return out

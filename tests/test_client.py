@@ -52,10 +52,13 @@ def test_value_checks():
 
 
 def test_extra_allowed_is_explicit():
-    base = {"filter.type": "urn:entity:movie", "filter.tags": ["t"], "feature.explainability": True}
+    base = {"filter.type": "urn:entity:movie", "filter.tags": ["t"], "page": 2}
     with pytest.raises(QlooParamError):
         P.validate_insights(base)
-    P.validate_insights(base, extra=["feature.explainability"])
+    P.validate_insights(base, extra=["page"])
+    # explainability and location.query were confirmed live and are allowed by default
+    P.validate_insights({"filter.type": "movie", "filter.tags": ["t"], "feature.explainability": True})
+    P.validate_insights({"filter.type": "place", "filter.location.query": "London"})
 
 
 def test_compare_and_tags_and_search_tables():
@@ -86,7 +89,7 @@ async def test_insights_affinity_and_list_encoding(client):
 
 async def test_compare_path(client):
     data = await client.compare(["mock-artist-001"], ["mock-artist-006"])
-    assert any(t["name"] == "Swing" for t in data["results"]["tags"])
+    assert any(x["tag"].name == "Swing" for x in data["shared"])
 
 
 async def test_legacy_endpoints_blocked(client):

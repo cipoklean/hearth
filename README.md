@@ -21,14 +21,30 @@ step-free access, mild films...) are handled by Hearth's own rules, labelled
 ### How a verdict is made
 
 1. `/search` resolves the name within the requested entity type.
+   Several exact-name matches resolve to the far better-known one when it leads
+   by >= 0.30 popularity (many titles have zero-popularity duplicates);
+   otherwise they come back for confirmation.
 2. `/v2/insights` with the profile's confirmed entity IDs/tags as signals and
-   `filter.results.entities=<candidate>` gives the candidate's affinity.
+   `filter.results.entities=<all candidates in that domain>` gives each
+   candidate's affinity in **one call per domain**, with
+   `feature.explainability=true` showing which favourite drives each score.
 3. The same signals without that filter give the best Qloo can offer this
-   person in that domain. **Relative fit = candidate / best.** Verdict thresholds
-   (good >= 0.80, weak >= 0.55) use relative fit so they do not depend on the
-   API's absolute score scale.
-4. Swap = the highest-ranked Qloo entity above the candidate that passes the
-   person's care rules.
+   person in that domain (for places, within `place_location`).
+   **Relative fit = candidate / best.**
+4. Verdicts (Hearth thresholds, calibrated against the live API with four
+   older-adult personas, Oct 2026):
+
+   | Type | good | weak | absolute floors | status |
+   | --- | --- | --- | --- | --- |
+   | artist, movie | rel >= 0.94 and affinity >= 0.85 | rel >= 0.84 | affinity < 0.78 is always poor | calibrated |
+   | place | rel >= 0.95 | rel >= 0.90 | none | provisional |
+   | other types | rel >= 0.94 | rel >= 0.84 | none | uncalibrated (flagged in evidence) |
+
+   A pick that is already a confirmed favourite is `good` without scoring
+   (Qloo never returns signal entities as results).
+5. Swap = the highest-ranked live Qloo entity above the candidate that passes
+   the person's care rules, with the reason (the favourite Qloo links it to,
+   shared tags).
 
 ## Run it (mock mode, no key needed)
 
@@ -62,6 +78,16 @@ curl -X POST localhost:8000/verify -H 'content-type: application/json' -d '{
                  {"name": "Midnight in the Cellar", "domain": "movie"},
                  {"name": "Harbour Lights", "domain": "movie"}]}'
 ```
+
+### Live smoke test
+
+```bash
+QLOO_API_KEY=... python scripts/live_smoke.py        # 4 personas, verdict table
+python scripts/live_smoke.py --persona swing --no-place
+```
+
+Personas are names only; everything is resolved live and cached privately
+under `.cache/qloo` (gitignored). About 80 calls on a cold cache, 0 when warm.
 
 ## Environment
 

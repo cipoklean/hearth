@@ -2,8 +2,11 @@
 
 Serves responses shaped like Qloo's from a small, invented catalogue
 (fixtures/synthetic_catalog.json). Affinity is a deterministic toy formula over
-tag overlap plus tag "families" (to imitate cross-domain links). It is NOT a
-model of Qloo and its numbers mean nothing outside tests and demos.
+tag overlap plus tag "families" (to imitate cross-domain links), squeezed into
+roughly the band the live API uses (fits ~0.85-0.98, mismatches ~0.62-0.78) so
+the calibrated verdict thresholds behave sensibly offline. It is NOT a model
+of Qloo and its numbers mean nothing outside tests and demos. Response shapes
+follow what the live API returned on 2026-10-24 (see qloo/client.py).
 """
 from __future__ import annotations
 
@@ -41,21 +44,40 @@ class MockQloo:
         return {e["entity_id"]: e for e in self.data["entities"]}
 
     # ---- rendering -------------------------------------------------------
-    def _render(self, e: dict[str, Any], affinity: float | None = None) -> dict[str, Any]:
-        out = {
+    def _render(self, e: dict[str, Any], affinity: float | None = None, *, search: bool = False,
+                explain: dict[str, float] | None = None) -> dict[str, Any]:
+        out: dict[str, Any] = {
             "name": e["name"],
             "entity_id": e["entity_id"],
-            "type": "urn:entity",
-            "subtype": e["type"],
-            "types": [e["type"]],
             "popularity": e["popularity"],
             "properties": dict(e["properties"]),
-            "tags": [{"tag_id": t, "id": t, "name": self.tags[t]["name"], "type": self.tags[t]["type"]}
-                     for t in e["tags"]],
         }
+        if search:  # /search: "types" list, tags keyed tag_id
+            out["types"] = [e["type"]]
+            out["tags"] = [{"tag_id": t, "name": self.tags[t]["name"], "type": self.tags[t]["type"], "value": t}
+                           for t in e["tags"]]
+        else:       # /v2/insights: type + subtype, tags keyed id
+            out["type"] = "urn:entity"
+            out["subtype"] = e["type"]
+            out["tags"] = [{"id": t, "name": self.tags[t]["name"], "type": self.tags[t]["type"]}
+                           for t in e["tags"]]
         if affinity is not None:
-            out["query"] = {"affinity": affinity}
+            out["query"] = {"affinity": affinity, "measurements": {"audience_growth": 0}}
+            if explain is not None:
+                out["query"]["explainability"] = {"signal.interests.entities": [
+                    {"entity_id": k, "score": v} for k, v in explain.items()]}
         return out
+
+    def _explain(self, e: dict[str, Any], sig_ents: list[str]) -> dict[str, float]:
+        """Toy per-signal shares (sum to 1), by tag-family overlap with the candidate."""
+        cf = self._families(e["tags"])
+        raw = {}
+        for sid in sig_ents:
+            se = self.entities.get(sid)
+            ov = len(cf & self._families(se["tags"])) if se else 0
+            raw[sid] = 1.0 + 2.0 * ov
+        tot = sum(raw.values()) or 1.0
+        return {k: round(v / tot, 4) for k, v in raw.items()}
 
     def _families(self, tag_ids: list[str]) -> set[str]:
         return {f for t in tag_ids if t in self.tags for f in self.tags[t]["families"]}
@@ -65,7 +87,8 @@ class MockQloo:
         direct = len(set(ctags) & sig_tags) / len(ctags) if ctags else 0.0
         cf = self._families(ctags)
         fam = len(cf & sig_fams) / len(cf) if cf else 0.0
-        return round(min(0.99, 0.1 + 0.45 * direct + 0.45 * fam + 0.05 * e["popularity"]), 4)
+        raw = 0.45 * direct + 0.45 * fam + 0.10 * e["popularity"]  # 0..1
+        return round(0.62 + 0.36 * raw ** 0.5, 4)
 
     # ---- handler ---------------------------------------------------------
     def handle(self, request: httpx.Request) -> httpx.Response:
@@ -106,7 +129,7 @@ class MockQloo:
             if score >= 0.55:
                 scored.append((score, e))
         scored.sort(key=lambda x: (-x[0], -x[1]["popularity"], x[1]["entity_id"]))
-        return {"results": [self._render(e) for _, e in scored[:take]]}
+        return {"results": [self._render(e, search=True) for _, e in scored[:take]]}
 
     def tag_search(self, q: dict[str, str]) -> dict[str, Any]:
         query = q.get("filter.query", "").lower()
@@ -116,7 +139,8 @@ class MockQloo:
                 if (not query or query in t["name"].lower() or query in t["id"])
                 and (not types or t["type"] in types)]
         return {"success": True, "results": {"tags": [
-            {"id": t["id"], "name": t["name"], "types": [t["type"]]} for t in hits[:take]]}}
+            {"id": t["id"], "name": t["name"], "type": t["type"], "popularity": 0.9,
+             "parents": [], "properties": {}, "tags": []} for t in hits[:take]]}}
 
     def insights(self, q: dict[str, str]) -> dict[str, Any]:
         ftype = q.get("filter.type")
@@ -140,6 +164,8 @@ class MockQloo:
         pool = [e for e in self.entities.values() if e["type"] == ftype]
         if only := set(_split(q.get("filter.results.entities"))):
             pool = [e for e in pool if e["entity_id"] in only]
+        else:  # like the live API, signal entities are not returned as their own results
+            pool = [e for e in pool if e["entity_id"] not in set(sig_ents)]
         if excl := set(_split(q.get("filter.exclude.entities"))):
             pool = [e for e in pool if e["entity_id"] not in excl]
         if ftags := set(_split(q.get("filter.tags"))):
@@ -151,8 +177,10 @@ class MockQloo:
         scored.sort(key=lambda x: (-x[0], x[1]["entity_id"]))
         offset = int(q.get("offset", 0))
         take = int(q.get("take", 20))
+        explain = q.get("feature.explainability") == "true" and sig_ents
         return {"success": True, "results": {"entities": [
-            self._render(e, a) for a, e in scored[offset:offset + take]]}}
+            self._render(e, a, explain=self._explain(e, sig_ents) if explain else None)
+            for a, e in scored[offset:offset + take]]}}
 
     def compare(self, q: dict[str, str]) -> dict[str, Any]:
         a = _split(q.get("a.signal.interests.entities"))
@@ -160,8 +188,15 @@ class MockQloo:
         ta = {t for i in a if i in self.entities for t in self.entities[i]["tags"]}
         tb = {t for i in b if i in self.entities for t in self.entities[i]["tags"]}
         shared = sorted(ta & tb)
-        return {"success": True, "results": {"tags": [
-            {"tag_id": t, "name": self.tags[t]["name"], "shared": True} for t in shared]}}
+
+        def tag(t: str, query: dict[str, Any]) -> dict[str, Any]:
+            return {"tag_id": t, "name": self.tags[t]["name"], "type": "urn:tag",
+                    "subtype": self.tags[t]["type"], "popularity": 0.5, "query": query}
+        return {"duration": 1, "results": {
+            "tags": [tag(t, {"score": 1.0}) for t in shared],
+            "a": [tag(t, {"count": "1"}) for t in sorted(ta - tb)],
+            "b": [tag(t, {"count": "1"}) for t in sorted(tb - ta)],
+            "matchEntities": []}}
 
 
 class _HTTP(Exception):

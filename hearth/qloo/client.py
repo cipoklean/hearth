@@ -155,14 +155,42 @@ class QlooClient:
         return parse_insights(data)
 
     async def compare(self, a_ids: list[str], b_ids: list[str], **extra: Any) -> dict[str, Any]:
-        """GET /v2/analysis/compare. Response schema is not documented in detail; returned raw."""
+        """GET /v2/analysis/compare -> parse_compare() shape (shared / a_only / b_only tags)."""
         p = {"a.signal.interests.entities": a_ids, "b.signal.interests.entities": b_ids, **extra}
-        return await self._get("/v2/analysis/compare", P.validate_compare(p))
+        return parse_compare(await self._get("/v2/analysis/compare", P.validate_compare(p)))
 
 
 # ---- tolerant response parsing ---------------------------------------------
+# Shapes checked against the live hackathon API on 2026-10-24:
+#   /search          {"results": [ {entity_id, name, types:[urn], popularity, properties, disambiguation,
+#                                   tags:[{tag_id, name, type, value}]} ]}            (no "subtype")
+#   /v2/insights     {"success", "results": {"entities": [ {entity_id, name, type:"urn:entity",
+#                     subtype:"urn:entity:artist", popularity, properties, tags:[{id, name, type}],
+#                     query:{affinity, measurements?, distance? (place),
+#                            explainability?:{"signal.interests.entities":[{entity_id, score}]}}} ]}}
+#   /v2/tags         {"results": {"tags": [ {id, name, type, popularity, parents:[{type}], properties} ]}}
+#   /v2/analysis/compare {"duration", "results": {"tags": [ {tag_id, name, subtype, query:{score,
+#                     "a.signal.interests.entities":[...], "b.signal...":[...]}} ],
+#                     "a": [tag...], "b": [tag...], "matchEntities": []}}   (take is not honoured)
 def _parse_tag(t: Mapping[str, Any]) -> Tag:
-    return Tag(id=str(t.get("tag_id") or t.get("id") or t.get("value") or ""), name=str(t.get("name") or ""))
+    return Tag(id=str(t.get("tag_id") or t.get("id") or t.get("value") or ""),
+               name=str(t.get("name") or ""),
+               type=str(t.get("subtype") if t.get("type") == "urn:tag" else (t.get("type") or "")))
+
+
+def _parse_explainability(q: Mapping[str, Any]) -> dict[str, float]:
+    """query.explainability -> {signal entity id: share}. Shares sum to ~1 across signals."""
+    ex = q.get("explainability")
+    if not isinstance(ex, Mapping):
+        return {}
+    out: dict[str, float] = {}
+    for item in ex.get("signal.interests.entities") or []:
+        if isinstance(item, Mapping) and item.get("entity_id") is not None:
+            try:
+                out[str(item["entity_id"])] = float(item.get("score") or 0.0)
+            except (TypeError, ValueError):
+                continue
+    return out
 
 
 def _parse_entity(e: Mapping[str, Any]) -> EntityRef:
@@ -170,11 +198,18 @@ def _parse_entity(e: Mapping[str, Any]) -> EntityRef:
     if (not etype or etype == "urn:entity") and e.get("types"):
         etype = next((t for t in e["types"] if t.startswith("urn:entity:")), e["types"][0])
     props = dict(e.get("properties") or {})
-    if "popularity" in e:
+    if e.get("popularity") is not None:
         props.setdefault("popularity", e["popularity"])
+    if e.get("disambiguation"):
+        props.setdefault("disambiguation", e["disambiguation"])
     q = e.get("query") or {}
-    if isinstance(q, Mapping) and "affinity" in q:
-        props["affinity"] = q["affinity"]
+    if isinstance(q, Mapping):
+        if q.get("affinity") is not None:
+            props["affinity"] = q["affinity"]
+        if q.get("distance") is not None:
+            props["distance"] = q["distance"]
+        if ex := _parse_explainability(q):
+            props["explainability"] = ex
     return EntityRef(
         id=str(e.get("entity_id") or e.get("id")),
         name=str(e.get("name") or ""),
@@ -188,16 +223,40 @@ def parse_search(data: Mapping[str, Any]) -> list[EntityRef]:
     res = data.get("results") or []
     if isinstance(res, Mapping):
         res = res.get("entities") or []
-    return [_parse_entity(e) for e in res]
+    return [_parse_entity(e) for e in res if isinstance(e, Mapping)]
 
 
 def parse_insights(data: Mapping[str, Any]) -> list[EntityRef]:
     res = data.get("results") or {}
     ents = res.get("entities") if isinstance(res, Mapping) else res
-    return [_parse_entity(e) for e in (ents or [])]
+    return [_parse_entity(e) for e in (ents or []) if isinstance(e, Mapping)]
 
 
 def parse_tags(data: Mapping[str, Any]) -> list[Tag]:
     res = data.get("results") or {}
     tags = res.get("tags") if isinstance(res, Mapping) else res
-    return [_parse_tag(t) for t in (tags or [])]
+    return [_parse_tag(t) for t in (tags or []) if isinstance(t, Mapping)]
+
+
+def parse_compare(data: Mapping[str, Any]) -> dict[str, Any]:
+    """Shared tags (with Qloo's score, highest first) plus tags only on each side.
+
+    Live observation: compare is broad (two unrelated artists still share
+    generic tags like a country or "Blues"), so it is evidence, not a fit score.
+    """
+    res = data.get("results") or {}
+    if not isinstance(res, Mapping):
+        return {"shared": [], "a_only": [], "b_only": []}
+    shared = []
+    for t in res.get("tags") or []:
+        if not isinstance(t, Mapping):
+            continue
+        q = t.get("query") or {}
+        score = q.get("score") if isinstance(q, Mapping) else None
+        shared.append((_parse_tag(t), float(score) if score is not None else 0.0))
+    shared.sort(key=lambda x: -x[1])
+    return {
+        "shared": [{"tag": tag, "score": sc} for tag, sc in shared],
+        "a_only": [_parse_tag(t) for t in res.get("a") or [] if isinstance(t, Mapping)],
+        "b_only": [_parse_tag(t) for t in res.get("b") or [] if isinstance(t, Mapping)],
+    }
