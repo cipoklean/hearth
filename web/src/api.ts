@@ -63,12 +63,15 @@ function homeId(): string {
   return id;
 }
 
+// Set VITE_API_BASE (e.g. https://hearth.example.com) when the frontend is hosted apart from the API.
+const API_BASE: string = (import.meta.env.VITE_API_BASE ?? "").replace(/\/+$/, "");
+
 export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch("/api" + path, {
+  const res = await fetch(API_BASE + "/api" + path, {
     method,
     headers: { "X-Hearth-Home": homeId(), ...(body ? { "content-type": "application/json" } : {}) },
     body: body ? JSON.stringify(body) : undefined,

@@ -237,3 +237,11 @@ cache live in `/var/lib/hearth`, outside the repo.
 ## License
 
 MIT
+
+## Frontend on Vercel (optional)
+
+The API can stay on the VM while the web app is hosted on Vercel:
+
+1. Import this repo in Vercel and set **Root Directory** to `web` (framework: Vite; `web/vercel.json` handles SPA routes).
+2. Add the environment variable `VITE_API_BASE=https://<your-api-host>` (no trailing slash), then deploy.
+3. The API allows `https://*.vercel.app` origins by default; for a custom domain set `HEARTH_CORS_ORIGINS` in `/etc/hearth.env` and restart.

@@ -424,6 +424,15 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
                 return FileResponse(f)
             return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
+    # Frontend may be hosted elsewhere (e.g. Vercel) and call this API cross-origin.
+    # HEARTH_CORS_ORIGINS: comma list of exact origins. HEARTH_CORS_ORIGIN_REGEX: default allows
+    # https://*.vercel.app (no cookies are used, so this exposes nothing beyond the public API).
+    from fastapi.middleware.cors import CORSMiddleware
+    origins = [o.strip() for o in os.environ.get("HEARTH_CORS_ORIGINS", "").split(",") if o.strip()]
+    origin_regex = os.environ.get("HEARTH_CORS_ORIGIN_REGEX", r"https://[a-z0-9-]+\.vercel\.app") or None
+    app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=origin_regex,
+                       allow_credentials=False, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+                       allow_headers=["X-Hearth-Home", "content-type"], max_age=86400)
     return app
 
 
