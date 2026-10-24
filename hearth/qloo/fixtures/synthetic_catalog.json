@@ -1,0 +1,692 @@
+{
+ "_notice": "SYNTHETIC FIXTURES. Every entity, tag id, name, address and number here was invented for offline development of Hearth. None of it is Qloo data or derived from Qloo responses. Tag ids imitate Qloo's urn format only so code paths match.",
+ "tags": [
+  {
+   "id": "urn:tag:genre:music:big_band",
+   "name": "Big Band",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "nostalgia"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:swing",
+   "name": "Swing",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "nostalgia",
+    "upbeat"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:crooner",
+   "name": "Crooner",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "nostalgia",
+    "romantic"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:highlife",
+   "name": "Highlife",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "west_african",
+    "upbeat"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:gospel",
+   "name": "Gospel",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "spiritual"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:classical",
+   "name": "Classical",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "calm"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:rock_and_roll",
+   "name": "Rock and Roll",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "nostalgia",
+    "upbeat"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:country",
+   "name": "Country",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "americana"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:folk",
+   "name": "Folk",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "calm",
+    "americana"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:music:heavy_metal",
+   "name": "Heavy Metal",
+   "type": "urn:tag:genre:music",
+   "families": [
+    "dark",
+    "loud"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:musical",
+   "name": "Musical",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "nostalgia",
+    "upbeat"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:romance",
+   "name": "Romance",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "romantic"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:comedy",
+   "name": "Comedy",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "upbeat"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:western",
+   "name": "Western",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "americana"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:war",
+   "name": "War",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "dark"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:horror",
+   "name": "Horror",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "dark"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:drama",
+   "name": "Drama",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "romantic"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:documentary",
+   "name": "Documentary",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "calm",
+    "heritage"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:mystery",
+   "name": "Mystery",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "seaside"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:media:african_cinema",
+   "name": "African Cinema",
+   "type": "urn:tag:genre:media",
+   "families": [
+    "west_african"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:place:restaurant:italian",
+   "name": "Italian",
+   "type": "urn:tag:genre:place:restaurant",
+   "families": [
+    "comfort_food"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:place:restaurant:west_african",
+   "name": "West African",
+   "type": "urn:tag:genre:place:restaurant",
+   "families": [
+    "west_african",
+    "comfort_food"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:place:restaurant:caribbean",
+   "name": "Caribbean",
+   "type": "urn:tag:genre:place:restaurant",
+   "families": [
+    "upbeat",
+    "seaside"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:place:restaurant:british",
+   "name": "British",
+   "type": "urn:tag:genre:place:restaurant",
+   "families": [
+    "comfort_food",
+    "nostalgia"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:place:restaurant:tea_room",
+   "name": "Tea Room",
+   "type": "urn:tag:genre:place:restaurant",
+   "families": [
+    "calm",
+    "nostalgia"
+   ]
+  },
+  {
+   "id": "urn:tag:genre:place:restaurant:seafood",
+   "name": "Seafood",
+   "type": "urn:tag:genre:place:restaurant",
+   "families": [
+    "seaside"
+   ]
+  },
+  {
+   "id": "urn:tag:category:place:garden",
+   "name": "Garden",
+   "type": "urn:tag:category:place",
+   "families": [
+    "calm"
+   ]
+  },
+  {
+   "id": "urn:tag:category:place:museum",
+   "name": "Museum",
+   "type": "urn:tag:category:place",
+   "families": [
+    "heritage",
+    "calm"
+   ]
+  },
+  {
+   "id": "urn:tag:category:place:music_venue",
+   "name": "Ballroom / Music Venue",
+   "type": "urn:tag:category:place",
+   "families": [
+    "nostalgia",
+    "upbeat"
+   ]
+  },
+  {
+   "id": "urn:tag:category:place:cafe",
+   "name": "Cafe",
+   "type": "urn:tag:category:place",
+   "families": [
+    "calm"
+   ]
+  },
+  {
+   "id": "urn:tag:category:place:nightclub",
+   "name": "Nightclub",
+   "type": "urn:tag:category:place",
+   "families": [
+    "loud"
+   ]
+  }
+ ],
+ "entities": [
+  {
+   "entity_id": "mock-artist-001",
+   "name": "The Marlow Sisters",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:big_band",
+    "urn:tag:genre:music:swing",
+    "urn:tag:genre:music:crooner"
+   ],
+   "popularity": 0.62,
+   "properties": {
+    "decade": "1940s",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-002",
+   "name": "Teddy Okafor & His Highlife Band",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:highlife",
+    "urn:tag:genre:music:big_band"
+   ],
+   "popularity": 0.51,
+   "properties": {
+    "decade": "1960s",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-003",
+   "name": "Ruth Adair",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:crooner",
+    "urn:tag:genre:music:gospel"
+   ],
+   "popularity": 0.44,
+   "properties": {
+    "decade": "1950s",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-004",
+   "name": "The Silverline Orchestra",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:classical"
+   ],
+   "popularity": 0.5,
+   "properties": {
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-005",
+   "name": "Buck Hollis",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:country",
+    "urn:tag:genre:music:folk"
+   ],
+   "popularity": 0.45,
+   "properties": {
+    "decade": "1960s",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-006",
+   "name": "The Jivetones",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:rock_and_roll",
+    "urn:tag:genre:music:swing"
+   ],
+   "popularity": 0.55,
+   "properties": {
+    "decade": "1950s",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-007",
+   "name": "Grindcore Unit",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:heavy_metal"
+   ],
+   "popularity": 0.3,
+   "properties": {
+    "decade": "2010s",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-artist-008",
+   "name": "Mahalia Grace Choir",
+   "type": "urn:entity:artist",
+   "tags": [
+    "urn:tag:genre:music:gospel"
+   ],
+   "popularity": 0.36,
+   "properties": {
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-001",
+   "name": "Harbour Lights",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:musical",
+    "urn:tag:genre:media:romance"
+   ],
+   "popularity": 0.48,
+   "properties": {
+    "release_year": 1954,
+    "duration": 98,
+    "content_rating": "G",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-002",
+   "name": "Harbour Lights",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:drama",
+    "urn:tag:genre:media:war"
+   ],
+   "popularity": 0.41,
+   "properties": {
+    "release_year": 1988,
+    "duration": 131,
+    "content_rating": "PG-13",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-003",
+   "name": "Dancing on the Pier",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:musical",
+    "urn:tag:genre:media:comedy"
+   ],
+   "popularity": 0.52,
+   "properties": {
+    "release_year": 1952,
+    "duration": 92,
+    "content_rating": "G",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-004",
+   "name": "Dust Road West",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:western"
+   ],
+   "popularity": 0.47,
+   "properties": {
+    "release_year": 1961,
+    "duration": 115,
+    "content_rating": "PG",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-005",
+   "name": "Midnight in the Cellar",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:horror"
+   ],
+   "popularity": 0.4,
+   "properties": {
+    "release_year": 1979,
+    "duration": 101,
+    "content_rating": "R",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-006",
+   "name": "The Village Choir",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:comedy",
+    "urn:tag:genre:media:musical"
+   ],
+   "popularity": 0.38,
+   "properties": {
+    "release_year": 1997,
+    "duration": 95,
+    "content_rating": "PG",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-007",
+   "name": "Letters to Lagos",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:drama",
+    "urn:tag:genre:media:romance",
+    "urn:tag:genre:media:african_cinema"
+   ],
+   "popularity": 0.35,
+   "properties": {
+    "release_year": 1975,
+    "duration": 104,
+    "content_rating": "PG",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-movie-008",
+   "name": "Iron Front",
+   "type": "urn:entity:movie",
+   "tags": [
+    "urn:tag:genre:media:war"
+   ],
+   "popularity": 0.58,
+   "properties": {
+    "release_year": 2005,
+    "duration": 140,
+    "content_rating": "R",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-001",
+   "name": "Nonna's Kitchen",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:genre:place:restaurant:italian",
+    "urn:tag:category:place:cafe"
+   ],
+   "popularity": 0.5,
+   "properties": {
+    "address": "12 Example Road, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-002",
+   "name": "Jollof House",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:genre:place:restaurant:west_african"
+   ],
+   "popularity": 0.46,
+   "properties": {
+    "address": "3 Fictional Street, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-003",
+   "name": "The Rose Tea Room",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:genre:place:restaurant:tea_room",
+    "urn:tag:genre:place:restaurant:british"
+   ],
+   "popularity": 0.42,
+   "properties": {
+    "address": "8 Placeholder Lane, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-004",
+   "name": "Calypso Grill",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:genre:place:restaurant:caribbean",
+    "urn:tag:genre:place:restaurant:seafood"
+   ],
+   "popularity": 0.49,
+   "properties": {
+    "address": "21 Harbour Way, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-005",
+   "name": "Sampletown Botanical Garden",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:category:place:garden"
+   ],
+   "popularity": 0.57,
+   "properties": {
+    "address": "1 Park Avenue, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-006",
+   "name": "Museum of Everyday Things",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:category:place:museum"
+   ],
+   "popularity": 0.44,
+   "properties": {
+    "address": "40 High Street, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-007",
+   "name": "The Bandstand Ballroom",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:category:place:music_venue"
+   ],
+   "popularity": 0.39,
+   "properties": {
+    "address": "5 Promenade, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-place-008",
+   "name": "Club Neon",
+   "type": "urn:entity:place",
+   "tags": [
+    "urn:tag:category:place:nightclub"
+   ],
+   "popularity": 0.6,
+   "properties": {
+    "address": "99 Late Street, Sampletown",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-book-001",
+   "name": "The Long Summer",
+   "type": "urn:entity:book",
+   "tags": [
+    "urn:tag:genre:media:romance",
+    "urn:tag:genre:media:drama"
+   ],
+   "popularity": 0.4,
+   "properties": {
+    "publication_year": 1958,
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-book-002",
+   "name": "Kitchen Stories",
+   "type": "urn:entity:book",
+   "tags": [
+    "urn:tag:genre:media:documentary"
+   ],
+   "popularity": 0.33,
+   "properties": {
+    "publication_year": 2001,
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-tv-001",
+   "name": "Seaside Detectives",
+   "type": "urn:entity:tv_show",
+   "tags": [
+    "urn:tag:genre:media:mystery",
+    "urn:tag:genre:media:comedy"
+   ],
+   "popularity": 0.5,
+   "properties": {
+    "release_year": 1989,
+    "content_rating": "TV-PG",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-tv-002",
+   "name": "The Garden Hour",
+   "type": "urn:entity:tv_show",
+   "tags": [
+    "urn:tag:genre:media:documentary"
+   ],
+   "popularity": 0.37,
+   "properties": {
+    "release_year": 1995,
+    "content_rating": "TV-G",
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-destination-001",
+   "name": "Sampletown Seafront",
+   "type": "urn:entity:destination",
+   "tags": [
+    "urn:tag:genre:place:restaurant:seafood",
+    "urn:tag:category:place:garden"
+   ],
+   "popularity": 0.45,
+   "properties": {
+    "synthetic": true
+   }
+  },
+  {
+   "entity_id": "mock-destination-002",
+   "name": "Riverside Old Town",
+   "type": "urn:entity:destination",
+   "tags": [
+    "urn:tag:category:place:museum",
+    "urn:tag:genre:place:restaurant:tea_room"
+   ],
+   "popularity": 0.41,
+   "properties": {
+    "synthetic": true
+   }
+  }
+ ]
+}
