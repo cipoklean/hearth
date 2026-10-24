@@ -37,7 +37,7 @@ if [[ $EUID -eq 0 ]]; then
 else
   APP_USER="$(id -un)"
   SUDO="sudo"
-  sudo -v || die "This script needs sudo."
+  sudo -n true 2>/dev/null || sudo true || die "This script needs sudo."
 fi
 APP_GROUP="$(id -gn "$APP_USER")"
 # sudo drops the environment, so pass the non-interactive apt frontend explicitly
