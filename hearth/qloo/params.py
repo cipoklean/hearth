@@ -15,6 +15,7 @@ from typing import Any, Iterable, Mapping
 
 # filter.type values the hackathon key supports for /v2/insights
 # (Qloo Agentic Hackathon Developer Guide). NOTE: the Insights Deep Dive enum
+# Live API (checked 2026-10-24): videogame works, video_game returns 400; destination works.
 # spells two of these differently (urn:entity:videogame, urn:entity:locality);
 # we follow the hackathon guide and map aliases below.
 ENTITY_TYPES: tuple[str, ...] = (
@@ -27,11 +28,11 @@ ENTITY_TYPES: tuple[str, ...] = (
     "urn:entity:place",
     "urn:entity:podcast",
     "urn:entity:tv_show",
-    "urn:entity:video_game",
+    "urn:entity:videogame",
 )
 
 TYPE_ALIASES: dict[str, str] = {
-    "urn:entity:videogame": "urn:entity:video_game",
+    "urn:entity:video_game": "urn:entity:videogame",
 }
 
 # Short domain names Hearth uses in its own API -> Qloo URN
@@ -117,7 +118,7 @@ INSIGHTS_ALLOWED: dict[str, frozenset[str]] = {
         "filter.release_country", "operator.filter.release_country",
         "filter.rating.min", "filter.rating.max",
     },
-    "urn:entity:video_game": _COMMON,
+    "urn:entity:videogame": _COMMON,
 }
 
 # Per the guide, destination *requires* signal.interests.entities.

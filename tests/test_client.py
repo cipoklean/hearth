@@ -29,8 +29,8 @@ def test_filter_type_required_and_supported():
 
 
 def test_aliases_and_short_names():
-    out = P.validate_insights({"filter.type": "urn:entity:videogame", "filter.tags": ["t"]})
-    assert out["filter.type"] == "urn:entity:video_game"
+    out = P.validate_insights({"filter.type": "urn:entity:video_game", "filter.tags": ["t"]})
+    assert out["filter.type"] == "urn:entity:videogame"
     assert P.validate_insights({"filter.type": "movie", "filter.tags": ["t"]})["filter.type"] == "urn:entity:movie"
 
 
