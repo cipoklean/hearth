@@ -11,6 +11,7 @@ Each browser keeps its own care home: it sends a random ``X-Hearth-Home`` id
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 import re
 from pathlib import Path
@@ -26,11 +27,14 @@ from . import __version__
 from .constraints import entity_filter
 from .demo import DEMO_CITY, DEMO_HOME, resolve_demo
 from .feedback import apply_feedback
+from .geo import geocode_point
 from .models import ERA_MAX_YEAR, ERA_MIN_YEAR, EntityRef, EraMode, Need, Profile, Tag
 from .planner import GroupPick, WeeklyPlan, group_pick, weekly_plan
 from .qloo import QlooClient, QlooError, QlooParamError
 from .ratelimit import RateLimiter, buckets_for
 from .storage import Store
+
+log = logging.getLogger(__name__)
 from .verifier import Candidate, Resolution, VerifyReport, domain_to_type, resolve, verify
 from .verifier.core import _tag_rank
 
@@ -155,6 +159,7 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
     async def lifespan(app: FastAPI):
         app.state.qloo = client or QlooClient()
         app.state.store = Store(db_path or os.environ.get("HEARTH_DB", "hearth.db"))
+        app.state.locations = {}    # town -> Qloo place filter (None = unplaceable)
         app.state.images = {}       # entity id -> Qloo image url, in memory only
         app.state.demo = None       # resolved demo favourites (process cache)
         app.state.demo_lock = asyncio.Lock()
@@ -205,9 +210,36 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         except ValueError as exc:
             raise HTTPException(422, str(exc)) from exc
 
-    def _place_extra(req: Request) -> dict | None:
+    async def _resolve_city(req: Request, city: str) -> dict | None:
+        """Qloo place filter for a town, or None if Hearth cannot place it.
+
+        Named localities Qloo knows are used as-is; otherwise the town is geocoded
+        (Open-Meteo, no key) and sent as a point with a 25 km radius."""
+        key = city.strip().lower()
+        cache: dict[str, dict | None] = req.app.state.locations
+        if key in cache:
+            return cache[key]
+        q = _qloo(req)
+        found: dict | None = {"filter.location.query": city}
+        if not q.mock:
+            try:
+                await q.insights({"filter.type": "urn:entity:place", **found, "take": 1})
+            except QlooError as exc:
+                if exc.status != 400:
+                    raise  # transient: don't cache
+                found = await geocode_point(city)
+        cache[key] = found
+        return found
+
+    async def _place_extra(req: Request) -> dict | None:
         city = _store(req).get_home(_home(req))["city"]
-        return {"filter.location.query": city} if city else None
+        return await _resolve_city(req, city) if city else None
+
+    def _city_note(req: Request, wp: Any) -> None:
+        city = _store(req).get_home(_home(req))["city"]
+        if city and req.app.state.locations.get(city.strip().lower(), True) is None:
+            wp.notes.insert(0, f"Hearth couldn't find {city} on the map, so meals and outings aren't local. "
+                               "Check the town name in your home settings.")
 
     def _remember(req: Request, model: BaseModel | list) -> None:
         data = [m.model_dump() for m in model] if isinstance(model, list) else model.model_dump()
@@ -239,7 +271,9 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
 
     @app.exception_handler(QlooError)
     async def _qloo_err(_: Request, exc: QlooError):
-        return JSONResponse(status_code=502, content={"detail": str(exc)})
+        log.warning("qloo error: %s", exc)
+        return JSONResponse(status_code=502, content={
+            "detail": "Hearth couldn't reach its taste service just now. Please try again in a moment."})
 
     @api.get("/health")
     async def health(req: Request) -> JSONResponse:
@@ -261,6 +295,9 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
 
     @api.put("/home")
     async def put_home(req: Request, body: HomeIn) -> dict[str, Any]:
+        if body.city and body.city.strip() and await _resolve_city(req, body.city.strip()) is None:
+            raise HTTPException(422, f"Hearth couldn't find \"{body.city.strip()}\" on the map. "
+                                     "Try the nearest larger town, or add the country.")
         return _store(req).set_home(_home(req), name=body.name, city=body.city)
 
     @api.delete("/home")
@@ -369,7 +406,7 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         swap_ok = entity_filter(prof.needs, _store(req).all_facts()) if prof.needs else None
         loc = body.place_location
         extra = {"place": {"filter.location.query": loc}} if loc else (
-            {"place": pe} if (pe := _place_extra(req)) else None)
+            {"place": pe} if (pe := await _place_extra(req)) else None)
         rep = await verify(_qloo(req), prof, body.candidates, swap_filter=swap_ok, ranked_extra=extra)
         _remember(req, rep)
         return rep
@@ -379,7 +416,8 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
                    skip_cuisine: list[str] = Query(default=[])) -> WeeklyPlan:
         """Weekly plan. ``skip`` (entity ids) and ``skip_cuisine`` swap picks for the next best."""
         wp = await weekly_plan(_qloo(req), _profile(req, rid), facts=_store(req).all_facts(),
-                               place_extra=_place_extra(req), skip_ids=skip, skip_cuisines=skip_cuisine)
+                               place_extra=await _place_extra(req), skip_ids=skip, skip_cuisines=skip_cuisine)
+        _city_note(req, wp)
         _remember(req, wp)
         return wp
 
@@ -388,7 +426,8 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         _domain(body.domain)
         profiles = [_profile(req, rid) for rid in dict.fromkeys(body.resident_ids)]
         gp = await group_pick(_qloo(req), profiles, body.domain, candidates=body.candidates,
-                              facts=_store(req).all_facts(), place_extra=_place_extra(req))
+                              facts=_store(req).all_facts(), place_extra=await _place_extra(req))
+        _city_note(req, gp)
         _remember(req, gp)
         return gp
 
