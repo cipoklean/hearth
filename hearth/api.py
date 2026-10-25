@@ -221,6 +221,12 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
             return cache[key]
         q = _qloo(req)
         found: dict | None = {"filter.location.query": city}
+        if not q.mock and "," in city:
+            # "Town, State": Qloo resolves only the part it knows (often the state),
+            # so place the town itself on the map first.
+            if (point := await geocode_point(city)) is not None:
+                cache[key] = point
+                return point
         if not q.mock:
             try:
                 await q.insights({"filter.type": "urn:entity:place", **found, "take": 1})

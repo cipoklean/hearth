@@ -8,7 +8,9 @@ import httpx
 
 log = logging.getLogger(__name__)
 GEOCODE_URL = os.environ.get("HEARTH_GEOCODE_URL", "https://geocoding-api.open-meteo.com/v1/search")
-RADIUS_M = 25_000
+RADIUS_M = 25_000        # cities
+SMALL_TOWN_RADIUS_M = 12_000  # towns: keeps the circle from spilling into the next state
+CITY_POPULATION = 500_000
 
 
 async def geocode_point(city: str, *, transport: httpx.AsyncBaseTransport | None = None) -> dict | None:
@@ -32,4 +34,5 @@ async def geocode_point(city: str, *, transport: httpx.AsyncBaseTransport | None
         return None
     best = max(results, key=lambda r: r.get("population") or 0)
     return {"filter.location": f"POINT({best['longitude']} {best['latitude']})",
-            "filter.location.radius": RADIUS_M}
+            "filter.location.radius": RADIUS_M if (best.get("population") or 0) >= CITY_POPULATION
+            else SMALL_TOWN_RADIUS_M}
