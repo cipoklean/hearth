@@ -17,13 +17,17 @@ export function HomeProvider({ children }: { children: React.ReactNode }) {
   const [residents, setResidents] = useState<Profile[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const refresh = useCallback(async () => {
-    try {
-      const [h, r] = await Promise.all([api.home(), api.residents()]);
-      setHome(h);
-      setResidents(r);
-      setError(null);
-    } catch (e) {
-      setError(e);
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const [h, r] = await Promise.all([api.home(), api.residents()]);
+        setHome(h);
+        setResidents(r);
+        setError(null);
+        return;
+      } catch (e) {
+        if (attempt >= 2) { setError(e); return; }
+        await new Promise((res) => setTimeout(res, 1500 * (attempt + 1)));
+      }
     }
   }, []);
   useEffect(() => { refresh(); }, [refresh]);

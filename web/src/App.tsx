@@ -59,6 +59,7 @@ function Shell() {
             <span className="masthead__home">
               {home.name}{home.city ? <span className="muted"> · {home.city}</span> : null}
               {home.demo && <span className="sample-pill">Sample home</span>}
+              {home.demo && !setup && <Link to="/setup" className="masthead__own">Start your own →</Link>}
             </span>
           )}
           {hasHome && !setup && (

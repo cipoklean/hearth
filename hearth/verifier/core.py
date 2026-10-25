@@ -264,28 +264,54 @@ async def top_for(client: QlooClient, profile: Profile, etype: str, *, take: int
     return await client.insights(p)
 
 
+def _genres(e: EntityRef) -> dict[str, str]:
+    return {t.id: t.name for t in e.tags if t.id.startswith("urn:tag:genre:")}
+
+
 def pick_swap(ranked: list[EntityRef], current_aff: float, best: float, profile: Profile,
-              exclude: set[str], swap_filter: SwapFilter | None, *, require_better: bool = True) -> Swap | None:
+              exclude: set[str], swap_filter: SwapFilter | None, *, require_better: bool = True,
+              like: EntityRef | None = None, used: set[str] | None = None) -> Swap | None:
+    """Best alternative from Qloo's ranked list for this profile.
+
+    Among alternatives Qloo scores higher than the current pick, prefer one that shares a genre
+    with the pick (a closer like-for-like swap), and one not already offered in this batch, so a
+    list of very different ideas doesn't all get the profile's single top title."""
+    eligible: list[EntityRef] = []
     for e in ranked:
         if e.id in exclude:
             continue
-        a = affinity_of(e)
-        if require_better and a <= current_aff:
+        if require_better and affinity_of(e) <= current_aff:
             break
         if out_of_era(e, profile) is not None:
             continue  # ranked lists are era-filtered by Qloo; this guards unfiltered callers
         if swap_filter and not swap_filter(e):
             continue
-        tags = shared_tags(e, profile)
-        lead = leading_favourite(signal_contributions(e, profile))
-        parts = []
-        if lead:
-            parts.append(f"Qloo links it most to {lead.name}")
-        if tags:
-            parts.append("shares " + ", ".join(t.name for t in tags[:3]))
-        why = "; ".join(parts) or "higher Qloo affinity for this profile"
-        return Swap(entity=e, qloo_affinity=a, relative_fit=relative_fit(a, best), shared_tags=tags, reason=why)
-    return None
+        eligible.append(e)
+    if not eligible:
+        return None
+    used = used if used is not None else set()
+    want = _genres(like) if like is not None else {}
+
+    def rank(i_e: tuple[int, EntityRef]) -> tuple[int, int, int]:
+        i, e = i_e
+        overlap = len(want.keys() & _genres(e).keys())
+        return (e.id in used, -min(overlap, 2), i)
+
+    _, e = min(enumerate(eligible), key=rank)
+    used.add(e.id)
+    a = affinity_of(e)
+    tags = shared_tags(e, profile)
+    lead = leading_favourite(signal_contributions(e, profile))
+    parts = []
+    common = sorted({want[g].lower() for g in want.keys() & _genres(e).keys()})
+    if like is not None and common:
+        parts.append(f"like {like.name}, it's {' and '.join(common[:2])}")
+    if lead:
+        parts.append(f"Qloo links it most to {lead.name}")
+    if tags:
+        parts.append("shares " + ", ".join(t.name for t in tags[:3]))
+    why = "; ".join(parts) or "higher Qloo affinity for this profile"
+    return Swap(entity=e, qloo_affinity=a, relative_fit=relative_fit(a, best), shared_tags=tags, reason=why)
 
 
 def _preflight(profile: Profile, cand: Candidate) -> CheckResult | str:
@@ -315,7 +341,7 @@ def _unresolved(cand: Candidate, res: Resolution, profile: Profile) -> CheckResu
 
 def _scored(cand: Candidate, res: Resolution, ent: EntityRef | None, ranked: list[EntityRef], profile: Profile,
             th: Thresholds, swap_filter: SwapFilter | None, swap_ranked: list[EntityRef] | None = None,
-            notes: list[str] | None = None) -> CheckResult:
+            notes: list[str] | None = None, used: set[str] | None = None) -> CheckResult:
     if ent is None:
         res.reason = "Qloo returned no affinity for this entity"
         return CheckResult(candidate=cand, resolution=res, verdict=Verdict.cannot_verify)
@@ -323,9 +349,9 @@ def _scored(cand: Candidate, res: Resolution, ent: EntityRef | None, ranked: lis
         ent.properties.setdefault("popularity", res.entity.properties["popularity"])
     res.entity = ent  # now carries Qloo tags/properties
     if swap_ranked is None:
-        return assess(cand, res, ent, ranked, profile, th=th, swap_filter=swap_filter, notes=notes)
+        return assess(cand, res, ent, ranked, profile, th=th, swap_filter=swap_filter, notes=notes, used=used)
     return assess(cand, res, ent, swap_ranked, profile, th=th, swap_filter=swap_filter, best_ranked=ranked,
-                  notes=notes)
+                  notes=notes, used=used)
 
 
 async def check_one(client: QlooClient, profile: Profile, cand: Candidate, *,
@@ -348,7 +374,8 @@ async def check_one(client: QlooClient, profile: Profile, cand: Candidate, *,
 
 def assess(cand: Candidate, res: Resolution, ent: EntityRef, ranked: list[EntityRef], profile: Profile,
            *, th: Thresholds = DEFAULT, swap_filter: SwapFilter | None = None,
-           best_ranked: list[EntityRef] | None = None, notes: Iterable[str] = ()) -> CheckResult:
+           best_ranked: list[EntityRef] | None = None, notes: Iterable[str] = (),
+           used: set[str] | None = None) -> CheckResult:
     """Pure: verdict, evidence and swap for an entity Qloo has already scored.
 
     ``ranked`` is where the swap comes from. ``best_ranked`` (default: ``ranked``) sets "best
@@ -383,7 +410,7 @@ def assess(cand: Candidate, res: Resolution, ent: EntityRef, ranked: list[Entity
     if verdict is not Verdict.good or late is not None:
         # An out-of-era pick gets the best in-era alternative even when Qloo scores it lower.
         swap = pick_swap(ranked, aff, best, profile, {ent.id, *profile.disliked}, swap_filter,
-                         require_better=late is None)
+                         require_better=late is None, like=ent, used=used)
         if swap is not None and late is not None and (era := profile.era) is not None:
             swap.reason += f"; within their era (up to {era.max_year})"
     return CheckResult(candidate=cand, resolution=res, verdict=verdict, evidence=ev, swap=swap)
@@ -424,10 +451,11 @@ async def verify(client: QlooClient, profile: Profile, candidates: list[Candidat
                                         extra={**(extras.get(etype) or {}), **hf})
         notes = filter_notes(profile, etype) if hf else []
         scored = await score_entities(client, profile, etype, [r.entity.id for _, r in items if r.entity])
+        used: set[str] = set()  # spread swaps across the batch
         for i, res in items:
             assert res.entity is not None
             results[i] = _scored(candidates[i], res, scored.get(res.entity.id), ranked, profile, th, swap_filter,
-                                 swap_ranked=swap_ranked, notes=notes)
+                                 swap_ranked=swap_ranked, notes=notes, used=used)
     done = [r for r in results if r is not None]
     counts: dict[str, int] = {}
     for r in done:

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { api, type Entity, type EraSetting, type Need, type Profile, type SearchHit } from "../api";
+import { api, newHomeId, type Entity, type EraSetting, type Need, type Profile, type SearchHit } from "../api";
 import { Icon } from "../components/Icon";
 import { EraPicker, ErrorNote, Photo, Source, TasteCard } from "../components/ui";
 import { autoEra, DOMAINS, type DomainKey, NEEDS } from "../lib";
@@ -15,7 +15,8 @@ const hitToEntity = (h: SearchHit): Entity => ({
 
 export function Setup() {
   const { home, refresh } = useHome();
-  const needsHome = !home?.name;
+  const fromSample = !!home?.demo;
+  const needsHome = !home?.name || fromSample;
   const [step, setStep] = useState<Step>(needsHome ? "home" : "name");
   const [homeName, setHomeName] = useState("");
   const [city, setCity] = useState("");
@@ -35,10 +36,22 @@ export function Setup() {
   ];
   const idx = steps.findIndex((s) => s.key === step);
 
+  const [homeErr, setHomeErr] = useState<unknown>(null);
+  const [savingHome, setSavingHome] = useState(false);
   async function saveHome(skip = false) {
-    if (!skip) await api.setHome(homeName.trim() || "Our home", city.trim());
-    else await api.setHome("Our home", "");
-    setStep("name");
+    setSavingHome(true);
+    setHomeErr(null);
+    try {
+      if (fromSample) newHomeId(); // the sample stays a sample; your home starts empty
+      if (!skip) await api.setHome(homeName.trim() || "Our home", city.trim());
+      else await api.setHome("Our home", "");
+      await refresh();
+      setStep("name");
+    } catch (e) {
+      setHomeErr(e);
+    } finally {
+      setSavingHome(false);
+    }
   }
 
   async function finish() {
@@ -77,7 +90,8 @@ export function Setup() {
         <section className="card-sheet">
           <span className="eyebrow">First, your home</span>
           <h1 className="display">What's your care home called?</h1>
-          <p className="lede lede--sm">The town helps Hearth suggest outings nearby. Both are optional.</p>
+          <p className="lede lede--sm">The town helps Hearth suggest meals and outings nearby. Both are optional.</p>
+          {fromSample && <p className="hint">You're leaving the sample home. Yours starts empty, and you can reopen Maple House from the welcome page any time.</p>}
           <form onSubmit={(e) => { e.preventDefault(); saveHome(); }} className="form">
             <label className="field"><span>Home name</span>
               <input value={homeName} onChange={(e) => setHomeName(e.target.value)} placeholder="e.g. Rosewood Lodge" maxLength={80} autoFocus />
@@ -85,9 +99,10 @@ export function Setup() {
             <label className="field"><span>Town or city</span>
               <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="e.g. Manchester" maxLength={80} />
             </label>
+            {homeErr != null && <ErrorNote error={homeErr} />}
             <div className="form__actions">
-              <button type="button" className="btn btn--ghost" onClick={() => saveHome(true)}>Skip for now</button>
-              <button className="btn btn--accent">Continue <Icon name="arrow" /></button>
+              <button type="button" className="btn btn--ghost" onClick={() => saveHome(true)} disabled={savingHome}>Skip for now</button>
+              <button className="btn btn--accent" disabled={savingHome}>{savingHome ? "Finding your town…" : "Continue"} <Icon name="arrow" /></button>
             </div>
           </form>
         </section>
@@ -173,7 +188,7 @@ export function Setup() {
 }
 
 function Favourites({ name, picked, setPicked, onBack, onNext }: {
-  name: string; picked: Entity[]; setPicked: (e: Entity[]) => void; onBack: () => void; onNext: () => void;
+  name: string; picked: Entity[]; setPicked: React.Dispatch<React.SetStateAction<Entity[]>>; onBack: () => void; onNext: () => void;
 }) {
   const [domain, setDomain] = useState<DomainKey>("artist");
   const [q, setQ] = useState("");
@@ -209,9 +224,12 @@ function Favourites({ name, picked, setPicked, onBack, onNext }: {
     return hits.filter((h) => h.name.toLowerCase() === n).length > 1;
   }, [hits, q]);
 
+  const [removed, setRemoved] = useState<Entity | null>(null);
   const isPicked = (id: string) => picked.some((p) => p.id === id);
   const toggle = (h: SearchHit) =>
-    setPicked(isPicked(h.id) ? picked.filter((p) => p.id !== h.id) : [...picked, hitToEntity(h)]);
+    setPicked((cur) => cur.some((p) => p.id === h.id) ? cur.filter((p) => p.id !== h.id) : [...cur, hitToEntity(h)]);
+  const remove = (e: Entity) => { setPicked((cur) => cur.filter((x) => x.id !== e.id)); setRemoved(e); };
+  const undo = () => { if (removed) setPicked((cur) => cur.some((p) => p.id === removed.id) ? cur : [...cur, removed]); setRemoved(null); };
 
   return (
     <section className="card-sheet card-sheet--wide">
@@ -222,7 +240,7 @@ function Favourites({ name, picked, setPicked, onBack, onNext }: {
       <div className="segmented" role="tablist" aria-label="Kind of favourite">
         {DOMAINS.map((x) => (
           <button key={x.key} role="tab" aria-selected={domain === x.key} className={domain === x.key ? "is-on" : ""}
-            onClick={() => { setDomain(x.key); setHits(null); }}>
+            onClick={() => { if (x.key !== domain) { setDomain(x.key); setHits(null); setQ(""); } }}>
             <Icon name={x.icon} size={20} />{x.label}
             {picked.some((p) => p.type.endsWith(":" + x.key)) && <span className="count">{picked.filter((p) => p.type.endsWith(":" + x.key)).length}</span>}
           </button>
@@ -267,10 +285,13 @@ function Favourites({ name, picked, setPicked, onBack, onNext }: {
             <span key={p.id} className="chip">
               <Photo entity={p} size={30} />
               {p.name}
-              <button aria-label={`Remove ${p.name}`} onClick={() => setPicked(picked.filter((x) => x.id !== p.id))}><Icon name="cross" size={14} /></button>
+              <button type="button" aria-label={`Remove ${p.name}`} onClick={() => remove(p)}><Icon name="cross" size={16} /></button>
             </span>
           ))}
         </div>
+        {removed && (
+          <p className="tray__undo" role="status">Removed {removed.name}. <button type="button" className="linkish" onClick={undo}>Undo</button></p>
+        )}
       </div>
 
       <div className="form__actions">

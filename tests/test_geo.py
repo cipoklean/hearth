@@ -47,3 +47,21 @@ def test_plan_survives_unplaceable_town(tmp_path):
         r = c.get(f"/api/residents/{rid}/plan", headers=h)
         assert r.status_code == 200
         assert "couldn't find Nowhere" in r.json()["notes"][0]
+
+
+def test_swaps_spread_and_prefer_shared_genre():
+    from hearth.models import EntityRef, Profile, Tag
+    from hearth.verifier.core import pick_swap
+    g = lambda k: Tag(id=f"urn:tag:genre:media:{k}", name=k.title(), type="urn:tag:genre:media")
+    def ent(i, aff, *genres):
+        return EntityRef(id=i, name=i, type="urn:entity:movie", tags=[g(x) for x in genres],
+                         properties={"affinity": aff})
+    ranked = [ent("top", 0.99, "drama"), ent("funny", 0.95, "comedy"), ent("scary", 0.9, "horror")]
+    prof = Profile(name="R")
+    used: set[str] = set()
+    a = pick_swap(ranked, 0.1, 0.99, prof, set(), None, like=ent("c1", 0.1, "comedy"), used=used)
+    b = pick_swap(ranked, 0.1, 0.99, prof, set(), None, like=ent("c2", 0.1, "comedy"), used=used)
+    c = pick_swap(ranked, 0.1, 0.99, prof, set(), None, like=ent("c3", 0.1, "horror"), used=used)
+    assert a.entity.id == "funny" and "comedy" in a.reason
+    assert b.entity.id == "top"  # funny already offered
+    assert c.entity.id == "scary"

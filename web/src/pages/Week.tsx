@@ -81,6 +81,7 @@ export function WeekPage({ id }: { id: string }) {
 
         {loading && <Loading label="Reading Qloo's taste graph and checking care rules…" rows={5} />}
         {error != null && <ErrorNote error={error} retry={() => reload()} />}
+        {plan?.notes?.map((n) => <p key={n} className="plan-note" role="note"><Icon name="info" /> {n}</p>)}
 
         {plan && (
           <>

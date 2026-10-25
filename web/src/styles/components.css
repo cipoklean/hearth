@@ -217,3 +217,10 @@
 .era__opt:focus-visible { outline: none; border-color: var(--ember); box-shadow: 0 0 0 4px var(--ember-soft); }
 .era__year input { max-width: 10rem; }
 .era-block { margin-top: 1.6rem; }
+
+/* plan-level notes, undo after removing a favourite, sample-home exit */
+.plan-note { display: flex; gap: 0.5rem; align-items: flex-start; background: var(--paper-2, #f6eedf); border-left: 3px solid var(--ember); padding: 0.7rem 0.9rem; border-radius: 6px; margin: 0.8rem 0; }
+.tray__undo { margin: 0.5rem 0 0; font-size: 0.95rem; color: var(--ink-2); }
+.linkish { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--ember-deep); text-decoration: underline; cursor: pointer; }
+.masthead__own { font: 700 0.85rem var(--sans); font-style: normal; color: var(--ember-deep); text-decoration: underline; text-underline-offset: 3px; }
+.chip button { min-width: 32px; min-height: 32px; display: inline-grid; place-items: center; }

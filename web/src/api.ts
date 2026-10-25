@@ -38,7 +38,7 @@ export interface PlanItem {
   entity: Entity | null; check: CheckResult | null; rules: RuleResult[]; dishes: Dish[];
   evidence_places: string[]; cuisine: string | null; notes: string[];
 }
-export interface WeeklyPlan { resident_id: string; name: string; items: PlanItem[]; source_note: string }
+export interface WeeklyPlan { resident_id: string; name: string; items: PlanItem[]; source_note: string; notes?: string[] }
 
 export interface ResidentFit { resident_id: string; name: string; relative_fit: number; qloo_affinity: number; verdict: VerdictKind; shared_tags: Tag[] }
 export interface LeftOut { resident_id: string; name: string; relative_fit: number; alternative: Entity | null; alternative_fit: number | null; reason: string }
@@ -51,6 +51,12 @@ export interface SearchHit {
   disambiguation: string | null; popularity: number | null; display_tags: string[]; tags: Tag[];
 }
 export interface HistoryRow { entity_id: string; name: string; type: string; enjoyed: boolean; created_at: string }
+
+/** Start a fresh, empty home in this browser (used when leaving the sample home). */
+export function newHomeId(): void {
+  localStorage.removeItem("hearth.home");
+  homeId();
+}
 
 function homeId(): string {
   let id = localStorage.getItem("hearth.home");
@@ -70,12 +76,36 @@ export class ApiError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+const TIMEOUT_MS = 45_000;
+
+async function send(method: string, path: string, body?: unknown): Promise<Response> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(API_BASE + "/api" + path, {
+      method,
+      headers: { "X-Hearth-Home": homeId(), ...(body ? { "content-type": "application/json" } : {}) },
+      body: body ? JSON.stringify(body) : undefined,
+      signal: ctl.signal,
+    });
+  } catch (e) {
+    if (ctl.signal.aborted) throw new ApiError(0, "Hearth is taking longer than usual. Please try again.");
+    throw new ApiError(0, "Couldn't reach Hearth. Check your connection, then try again.");
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function req<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const res = await fetch(API_BASE + "/api" + path, {
-    method,
-    headers: { "X-Hearth-Home": homeId(), ...(body ? { "content-type": "application/json" } : {}) },
-    body: body ? JSON.stringify(body) : undefined,
-  });
+  let res: Response;
+  try {
+    res = await send(method, path, body);
+  } catch (e) {
+    // One quiet retry for reads: a server restart or a dropped mobile packet shouldn't greet anyone.
+    if (method !== "GET" || (e as ApiError).message.startsWith("Hearth is taking")) throw e;
+    await new Promise((r) => setTimeout(r, 1200));
+    res = await send(method, path, body);
+  }
   if (!res.ok) {
     let msg = res.statusText;
     try { const j = await res.json(); msg = typeof j.detail === "string" ? j.detail : JSON.stringify(j.detail); } catch { /* keep */ }

@@ -182,15 +182,6 @@ export function CheckPage() {
         </section>
       </div>
 
-      <section className="compare-soon" aria-labelledby="soon-title">
-        <span className="stamp stamp--soon stamp--md" aria-hidden><span className="stamp__inner">Coming soon</span></span>
-        <h2 id="soon-title" className="display display--md">Without Qloo vs with Qloo</h2>
-        <p>Ask a language model for ideas, then see its plain answer beside Hearth's checked version: same question, same model, every claim stamped. We haven't chosen the model yet, so this stays empty rather than faked.</p>
-        <div className="compare-soon__cols" aria-hidden>
-          <div className="compare-soon__col"><span className="eyebrow">Without Qloo</span><i /><i /><i /><i /></div>
-          <div className="compare-soon__col"><span className="eyebrow">With Qloo (Hearth)</span><i /><i /><i /><i /></div>
-        </div>
-      </section>
     </main>
   );
 }
