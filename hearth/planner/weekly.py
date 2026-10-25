@@ -44,6 +44,7 @@ class WeeklyPlan(BaseModel):
     resident_id: str | None
     name: str
     items: list[PlanItem]
+    notes: list[str] = Field(default_factory=list)
     source_note: str = ("Picks and evidence come from Qloo. Care checks (labelled 'Hearth rule, not "
                         "Qloo'), the menu library and the schedule are Hearth's.")
 
