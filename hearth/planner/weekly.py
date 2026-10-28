@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 from ..constraints import (Dish, RuleResult, check_entity, cuisine_key, dishes_for, entity_filter,
                            passes)
-from ..constraints.rules import CUISINE_NAMES
+from ..constraints.rules import CUISINE_NAMES, unasked_dark
 from ..era import filter_notes, ranked_filters
 from ..models import EntityRef, Profile
 from ..qloo import QlooClient
@@ -86,8 +86,25 @@ def _pick_activity(ranked: list[EntityRef], profile: Profile, facts: Mapping[str
                    used: set[str], slot: str, day: str, *, skip_cuisine_only: bool = False,
                    best_ranked: list[EntityRef] | None = None, filter_note: list[str] | None = None) -> PlanItem:
     ok = entity_filter(profile.needs, facts)
+    item = _first_pick(ranked, profile, facts, used, slot, day, ok, skip_cuisine_only, best_ranked,
+                       filter_note, guard=True)
+    if item is None:  # every suitable title was darker than their favourites: allow, and say so
+        item = _first_pick(ranked, profile, facts, used, slot, day, ok, skip_cuisine_only, best_ranked,
+                           filter_note, guard=False)
+    if item is not None:
+        return item
+    return PlanItem(day=day, slot=slot, title="(no suitable pick found)",
+                    notes=["no Qloo result passed this resident's care rules"
+                           + (" and era setting" if filter_note else "") + "; staff to choose", *(filter_note or [])])
+
+
+def _first_pick(ranked, profile, facts, used, slot, day, ok, skip_cuisine_only, best_ranked, filter_note,
+                *, guard: bool) -> PlanItem | None:
     for e in ranked:
         if e.id in used or e.id in profile.disliked:
+            continue
+        dark = unasked_dark(e, profile)
+        if guard and dark:
             continue
         if skip_cuisine_only and e.tags and all(t.id.startswith(CUISINE_PREFIX) for t in e.tags):
             continue  # outings: prefer non-restaurant places
@@ -102,12 +119,12 @@ def _pick_activity(ranked: list[EntityRef], profile: Profile, facts: Mapping[str
                        notes=filter_note or ())
         used.add(e.id)
         notes = [*(filter_note or []), *(f"staff to confirm: {r.reason}" for r in rules if r.outcome.value == "unknown")]
+        if dark:
+            notes.append(f"staff to preview: {dark}")
         if any(x.id == e.id for x in profile.entities):
             notes.insert(0, "a known favourite (already in their profile)")
         return PlanItem(day=day, slot=slot, title=e.name, entity=e, check=check, rules=rules, notes=notes)
-    return PlanItem(day=day, slot=slot, title="(no suitable pick found)",
-                    notes=["no Qloo result passed this resident's care rules"
-                           + (" and era setting" if filter_note else "") + "; staff to choose", *(filter_note or [])])
+    return None
 
 
 async def weekly_plan(client: QlooClient, profile: Profile, *,

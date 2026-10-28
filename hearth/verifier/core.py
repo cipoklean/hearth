@@ -85,11 +85,50 @@ def _norm(s: str) -> str:
     return " ".join("".join(c.lower() if c.isalnum() else " " for c in s).split())
 
 
+_ROMAN = {"ii": "2", "iii": "3", "iv": "4", "v": "5", "vi": "6", "vii": "7", "viii": "8", "ix": "9", "x": "10"}
+_WORDS = {"two": "2", "three": "3", "four": "4", "five": "5", "six": "6", "seven": "7", "eight": "8", "nine": "9",
+          "ten": "10"}
+
+
+def _numbers(s: str) -> set[str]:
+    """Sequel/part numbers in a normalised name (digits, roman numerals, number words; years ignored)."""
+    out = set()
+    for tok in s.split():
+        if tok.isdigit() and len(tok) < 4:
+            out.add(str(int(tok)))
+        elif tok in _ROMAN:
+            out.add(_ROMAN[tok])
+        elif tok in _WORDS:
+            out.add(_WORDS[tok])
+        elif len(tok) > 1 and tok[0].isalpha() and tok[1:].isdigit() and len(tok) <= 3:
+            out.add(str(int(tok[1:])))  # "F9", "S2"
+    return out
+
+
+def _canon(s: str) -> str:
+    """Normalised name with numbers as digits and filler words dropped, for numbered-title matching."""
+    out = []
+    for tok in s.split():
+        if tok in ("and", "the", "a", "part"):
+            continue
+        n = _numbers(tok)
+        out.append(next(iter(n)) if n and not tok.isdigit() and tok in {**_ROMAN, **_WORDS} else tok)
+    return " ".join(out)
+
+
+def _same_numbers(query: str, candidate: str) -> bool:
+    """A numbered title only fuzzily matches a candidate carrying the same number (live: "Fast & Furious 9"
+    resolved to "Fast & Furious 6")."""
+    q = _numbers(query)
+    return not q or q <= _numbers(candidate)
+
+
 def match_candidates(name: str, results: list[EntityRef], th: Thresholds = DEFAULT) -> Resolution:
     """Decide resolved / ambiguous / cannot_verify from /search results."""
     if not results:
         return Resolution(status=ResolutionStatus.cannot_verify, reason="no Qloo entity matches this name")
     n = _norm(name)
+    numbered = _numbers(n)
     exact = [r for r in results if _norm(r.name) == n]
     if len(exact) == 1:
         return Resolution(status=ResolutionStatus.resolved, entity=exact[0])
@@ -103,6 +142,18 @@ def match_candidates(name: str, results: list[EntityRef], th: Thresholds = DEFAU
                                      f"({_label(by_pop[0])}); confirm if another was meant")
         return Resolution(status=ResolutionStatus.ambiguous, options=by_pop,
                           reason=f"{len(exact)} entities share this name; confirm which one")
+    if numbered:
+        results = [r for r in results if _same_numbers(n, _norm(r.name))]
+        if not results:
+            return Resolution(status=ResolutionStatus.cannot_verify,
+                              reason=f"Qloo has no title with this number ({', '.join(sorted(numbered))}); "
+                                     "Hearth won't swap in a different part")
+        cq = _canon(n)
+        close = sorted(((difflib.SequenceMatcher(None, cq, _canon(_norm(r.name))).ratio(), r) for r in results),
+                       key=lambda x: -x[0])
+        if close[0][0] >= 0.85 and (len(close) == 1 or close[0][0] - close[1][0] >= 0.1):
+            return Resolution(status=ResolutionStatus.resolved, entity=close[0][1],
+                              reason=f"close name match, same number ({close[0][0]:.2f})")
     ratios = sorted(((difflib.SequenceMatcher(None, n, _norm(r.name)).ratio(), r) for r in results),
                     key=lambda x: -x[0])
     top, top_r = ratios[0][0], ratios[0][1]

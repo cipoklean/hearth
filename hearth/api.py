@@ -453,6 +453,10 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
 
     app.include_router(api)
 
+    # ---- MCP: Hearth as a tool for any agent (POST /mcp) --------------------------
+    from . import mcp as _mcp
+    _mcp.mount(app)
+
     # ---- the web app (single process) -------------------------------------------
     dist = Path(web_dist) if web_dist else DIST
     index = dist / "index.html"
@@ -477,7 +481,7 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
     origin_regex = os.environ.get("HEARTH_CORS_ORIGIN_REGEX", r"https://[a-z0-9-]+\.vercel\.app") or None
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_origin_regex=origin_regex,
                        allow_credentials=False, allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-                       allow_headers=["X-Hearth-Home", "content-type"], max_age=86400)
+                       allow_headers=["X-Hearth-Home", "content-type", "accept", "mcp-protocol-version", "mcp-session-id"], max_age=86400)
     return app
 
 

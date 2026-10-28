@@ -15,6 +15,7 @@ from typing import Any, Mapping
 from pydantic import BaseModel, Field
 
 from ..constraints import check_entity, passes
+from ..constraints.rules import unasked_dark
 from ..era import ERA_LABEL, out_of_era, ranked_filters
 from ..models import EntityRef, Profile, Tag
 from ..qloo import QlooClient
@@ -141,6 +142,10 @@ async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *
             continue
         if late:
             out.notes.extend(f"{e.name}: {w}" for _, w in late)
+        dark = [(p.name, why) for p in profiles if (why := unasked_dark(e, p)) is not None]
+        if dark and not candidates:
+            out.excluded.append(Excluded(entity=e, reason="; ".join(f"{n}: {w}" for n, w in dark)))
+            continue
         if failing:
             out.excluded.append(Excluded(entity=e, reason="; ".join(failing) + " (Hearth rule, not Qloo)"))
         else:
@@ -162,7 +167,8 @@ async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *
             for e in tops[k]:
                 if e.id == pick.id or e.id in p.disliked:
                     continue
-                if passes(check_entity(e, p.needs, facts.get(e.id))) and out_of_era(e, p) is None:
+                if (passes(check_entity(e, p.needs, facts.get(e.id))) and out_of_era(e, p) is None
+                        and unasked_dark(e, p) is None):
                     alt, alt_fit = e, relative_fit(affinity_of(e), max(affinity_of(x) for x in bests[k]))
                     break
             out.left_out.append(LeftOut(

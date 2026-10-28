@@ -57,6 +57,8 @@ class Limit:
 
 def buckets_for(method: str, path: str) -> list[str]:
     """Which buckets a request counts against (empty = not limited)."""
+    if path == "/mcp" and method == "POST":
+        return ["api", "qloo"]  # every MCP call may reach Qloo
     if not path.startswith("/api/") or path in EXEMPT:
         return []
     out = ["api"]

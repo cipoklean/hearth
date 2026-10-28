@@ -1,6 +1,6 @@
 # Hearth
 
-**A taste-aware care coordinator for older adults.** Not a chatbot.
+**A taste-aware care coordinator for older adults.** Not a chatbot: a web app for staff and families, and an MCP tool any agent can call.
 
 Care homes and families plan meals, music sessions, film nights and outings for
 people whose tastes are easy to guess wrong. Hearth builds each resident's plan
@@ -45,6 +45,37 @@ FastAPI serves the built app at `/` and the JSON API under `/api`
 
 `scripts/screenshots.py BASE_URL OUT_DIR` walks every screen with Playwright
 (output is gitignored).
+
+## Use Hearth from any agent (MCP)
+
+Hearth is also an agent tool. The API serves a [Model Context Protocol](https://modelcontextprotocol.io)
+server at **`POST /mcp`** (Streamable HTTP, stateless, no auth, rate limited like the API), so Claude,
+Cursor, an OpenAI Agents SDK app or a care provider's own assistant can check its ideas before it
+recommends anything to an older person.
+
+```json
+{ "mcpServers": { "hearth": { "url": "https://hearth.158-180-57-167.sslip.io/mcp" } } }
+```
+
+| Tool | What the agent gets |
+| --- | --- |
+| `check_picks` | The person's favourites (by name) + needs + the agent's ideas -> a verdict per idea (good / weak / poor, `cannot_verify`, `ambiguous`), Qloo evidence, care-rule results and a better swap. |
+| `plan_week` | Favourites + needs (+ town) -> the weekly plan with evidence. |
+| `group_pick` | Several people -> the best shared film / artist / outing, fit per person, alternatives, exclusions. |
+| `find_entity` | Resolve a name to a Qloo entity (or say it can't). |
+
+The agent describes people by favourite names; Hearth resolves them on Qloo, and nothing sent to
+`/mcp` is stored. Without Qloo every tool fails: there is no taste to measure against.
+
+Quick check from a shell:
+
+```bash
+curl -s https://hearth.158-180-57-167.sslip.io/mcp -H 'content-type: application/json' -d '{
+  "jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"check_picks","arguments":{
+  "favourites":[{"name":"Frank Sinatra","domain":"artist"},{"name":"Casablanca","domain":"movie"}],
+  "needs":["mild_content"],
+  "candidates":[{"name":"Roman Holiday","domain":"movie"},{"name":"Fast & Furious 9","domain":"movie"}]}}}'
+```
 
 ## What it does
 

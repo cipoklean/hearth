@@ -202,3 +202,38 @@ def entity_filter(needs: Iterable[Need], facts_for: Mapping[str, Mapping[str, An
 def dishes_for(cuisine: str, needs: Iterable[Need], limit: int = 3) -> list[Dish]:
     needs = list(needs)
     return [d for d in dish_library() if d.cuisine == cuisine and passes(check_dish(d, needs))][:limit]
+
+
+# Suggesting films nobody asked for: dark genres (and strong ratings) only when the person's own
+# favourites already show them. Live: a resident whose favourites were Fela Kuti and a jollof
+# restaurant got "The Fool" (2014), a violent crime film, as film night. Named picks are still
+# scored as asked; this only steers what Hearth *suggests*.
+DARK_FILM_KEYS = ("crime", "horror", "thriller", "war", "gangster", "slasher", "splatter", "exploitation",
+                  "torture", "gore", "serial_killer", "mafia")
+
+
+def _dark_keys(tag_ids) -> set[str]:
+    out = set()
+    for tid in tag_ids:
+        if tid.startswith("urn:tag:genre:") or tid.startswith("urn:tag:subgenre:"):
+            last = tid.rsplit(":", 1)[-1]
+            out.update(k for k in DARK_FILM_KEYS if k in last)
+    return out
+
+
+def unasked_dark(e: EntityRef, profile) -> str | None:
+    """Why a film/TV suggestion is darker than anything in this person's favourites, else None."""
+    if e.type.rsplit(":", 1)[-1] not in {"movie", "tv_show"}:
+        return None
+    if any(x.id == e.id for x in profile.entities):
+        return None
+    liked = profile.known_tags()
+    new = _dark_keys(t.id for t in e.tags) - _dark_keys(liked)
+    if new:
+        return f"{', '.join(sorted(k.replace('_', ' ') for k in new))} film, and none of their favourites are ({LABEL})"
+    rating = str(e.properties.get("content_rating") or "")
+    if rating in STRONG_RATINGS and not any(str(x.properties.get("content_rating") or "") in STRONG_RATINGS
+                                            for x in profile.entities if x.weight > 0):
+        return f"rated {rating}, stronger than their favourites ({LABEL})"
+    return None
+
