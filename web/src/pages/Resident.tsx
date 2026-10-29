@@ -4,6 +4,8 @@ import { Icon } from "../components/Icon";
 import { Collage, Empty, EraPicker, ErrorNote, Loading, NeedBadge, Photo, Source, Stamp, useToast } from "../components/ui";
 import { autoEra, DOMAINS, favourites, kindOf, needInfo, SLOT, tasteLine, yearOf } from "../lib";
 import { usePlan } from "../plan";
+import { TalkCard } from "../components/TalkCard";
+import { PlaylistPanel } from "../components/PlaylistPanel";
 import { Link } from "../router";
 import { useAsync } from "../state";
 
@@ -121,6 +123,16 @@ export function ResidentPage({ id }: { id: string }) {
           )}
           <Link to={`/r/${id}/week`} className="btn btn--ghost btn--block">See the full week, swap or print <Icon name="arrow" /></Link>
         </section>
+      </div>
+
+      <div className="profile-grid profile-grid--two">
+        <div>
+          <TalkCard profile={p} picks={plan?.items || []} />
+          <button className="btn btn--ghost no-print" onClick={() => { document.body.classList.add("print-talk"); print(); setTimeout(() => document.body.classList.remove("print-talk"), 500); }}>
+            <Icon name="print" />Print talk-to-me card
+          </button>
+        </div>
+        <PlaylistPanel id={id} name={p.name} />
       </div>
 
       <p className="small muted center"><Link to="/privacy">What Hearth stores about {p.name}, and how to remove it</Link></p>

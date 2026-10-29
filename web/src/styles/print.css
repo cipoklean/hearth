@@ -38,3 +38,11 @@
   .playlist li::before { content: counter(n, decimal-leading-zero); font-family: var(--display); font-weight: 700; color: #8a2f10; width: 22pt; }
   .playlist li span { margin-left: auto; font-size: 9pt; letter-spacing: 0.08em; text-transform: uppercase; color: #555; }
 }
+
+/* Resident page: print only the talk-to-me card */
+@media print {
+  body.print-talk #main > main > *:not(.profile-grid--two) { display: none !important; }
+  body.print-talk .profile-grid--two { display: block; }
+  body.print-talk .panel--playlist, body.print-talk .profile-grid--two .btn { display: none !important; }
+  body.print-talk .talk-card { border: 2px solid #000; font-size: 13pt; }
+}

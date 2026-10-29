@@ -224,3 +224,15 @@
 .linkish { background: none; border: 0; padding: 0; font: inherit; font-weight: 700; color: var(--ember-deep); text-decoration: underline; cursor: pointer; }
 .masthead__own { font: 700 0.85rem var(--sans); font-style: normal; color: var(--ember-deep); text-decoration: underline; text-underline-offset: 3px; }
 .chip button { min-width: 32px; min-height: 32px; display: inline-grid; place-items: center; }
+
+/* talk-to-me card and playlist */
+.profile-grid--two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); margin-top: 1.5rem; }
+.talk-card { background: var(--paper, #fffaf1); border: 2px dashed var(--ember); border-radius: 14px; padding: 1.3rem 1.4rem; margin-bottom: 0.8rem; }
+.talk-card__line { font-style: italic; margin: 0.2rem 0 0.8rem; }
+.talk-card__list { list-style: none; padding: 0; margin: 0 0 0.8rem; display: grid; gap: 0.55rem; }
+.talk-card__list li { display: flex; gap: 0.5rem; align-items: baseline; line-height: 1.4; }
+.talk-card__list--plain li { display: block; }
+.talk-card__sub { font: 700 0.85rem var(--sans); letter-spacing: 0.06em; text-transform: uppercase; margin: 0.6rem 0 0.4rem; color: var(--ink-2); }
+.playlist-list { list-style: none; padding: 0; margin: 0.6rem 0 0; display: grid; gap: 0.6rem; }
+.playlist-list li { display: grid; grid-template-columns: 44px 1fr auto; gap: 0.7rem; align-items: center; }
+.playlist-list__text { display: grid; gap: 0.1rem; min-width: 0; }

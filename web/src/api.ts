@@ -50,6 +50,8 @@ export interface SearchHit {
   id: string; name: string; type: string; image: string | null; year: number | null;
   disambiguation: string | null; popularity: number | null; display_tags: string[]; tags: Tag[];
 }
+export interface PlaylistItem { entity: Entity; source: "favourite" | "qloo"; relative_fit: number | null; reason: string; shared_tags: Tag[] }
+export interface Playlist { resident_id: string; name: string; items: PlaylistItem[]; source_note: string }
 export interface HistoryRow { entity_id: string; name: string; type: string; enjoyed: boolean; created_at: string }
 
 /** Start a fresh, empty home in this browser (used when leaving the sample home). */
@@ -144,6 +146,7 @@ export const api = {
     }),
   setEra: (id: string, era: EraSetting) => req<Profile>("PUT", `/residents/${id}/era`, era),
   deleteResident: (id: string) => req<void>("DELETE", `/residents/${id}`),
+  playlist: (id: string) => req<Playlist>("GET", `/residents/${id}/playlist`),
   history: (id: string) => req<HistoryRow[]>("GET", `/residents/${id}/history`),
   plan: (id: string, skip: string[] = [], skipCuisine: string[] = []) =>
     req<WeeklyPlan>("GET", `/residents/${id}/plan${qs({ skip, skip_cuisine: skipCuisine })}`),

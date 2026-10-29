@@ -180,3 +180,12 @@ def test_demo_keeps_each_favourites_own_year(api):
     assert rose["era"]["max_year"] == 1962
     margaret = next(p for p in api.get("/api/residents").json() if p["name"] == "Margaret")
     assert margaret["era"]["max_year"] == 1964  # Harbour Lights (1954)
+
+
+def test_playlist(api):
+    rid = _resident(api, "Pat", "The Marlow Sisters")
+    pl = api.get(f"/api/residents/{rid}/playlist").json()
+    assert pl["items"][0]["source"] == "favourite"
+    qloo = [i for i in pl["items"] if i["source"] == "qloo"]
+    assert qloo and all(i["reason"] for i in qloo)
+    assert len({i["entity"]["id"] for i in pl["items"]}) == len(pl["items"])

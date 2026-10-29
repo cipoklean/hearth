@@ -4,6 +4,7 @@ import { Icon } from "../components/Icon";
 import { EvidenceBlock, ErrorNote, Loading, Photo, Source, Stamp, useToast } from "../components/ui";
 import { DAYS, sentence, displayTags, favourites, kindOf, leadFavourite, needInfo, SLOT, VERDICT, yearOf } from "../lib";
 import { usePlan } from "../plan";
+import { downloadEvidence } from "../evidence";
 import { Link } from "../router";
 import { useAsync, useHome } from "../state";
 
@@ -76,6 +77,10 @@ export function WeekPage({ id }: { id: string }) {
           <div className="page-head__actions">
             {swapped() > 0 && <button className="btn btn--ghost btn--sm" onClick={resetSwaps}>Undo swaps</button>}
             <button className="btn" onClick={() => print()} disabled={!plan}><Icon name="print" />Print week, menu & playlist</button>
+            <button className="btn btn--ghost" onClick={() => plan && p && downloadEvidence(plan, p, home?.name || "")} disabled={!plan || !p}
+              title="Every activity with why it fits, the care rules applied and staff feedback, for inspections (CQC, CMS F679)">
+              <Icon name="list" />Care evidence (CSV)
+            </button>
           </div>
         </section>
 

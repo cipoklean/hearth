@@ -29,7 +29,7 @@ from .demo import DEMO_CITY, DEMO_HOME, resolve_demo
 from .feedback import apply_feedback
 from .geo import geocode_point
 from .models import ERA_MAX_YEAR, ERA_MIN_YEAR, EntityRef, EraMode, Need, Profile, Tag
-from .planner import GroupPick, WeeklyPlan, group_pick, weekly_plan
+from .planner import GroupPick, Playlist, WeeklyPlan, group_pick, playlist, weekly_plan
 from .qloo import QlooClient, QlooError, QlooParamError
 from .ratelimit import RateLimiter, buckets_for
 from .storage import Store
@@ -426,6 +426,13 @@ def create_app(client: QlooClient | None = None, db_path: str | None = None,
         _city_note(req, wp)
         _remember(req, wp)
         return wp
+
+    @api.get("/residents/{rid}/playlist", response_model=Playlist)
+    async def playlist_route(req: Request, rid: str) -> Playlist:
+        """Favourite artists plus the artists Qloo ranks highest for this resident, each with a reason."""
+        pl = await playlist(_qloo(req), _profile(req, rid))
+        _remember(req, pl)
+        return pl
 
     @api.post("/group-pick", response_model=GroupPick)
     async def group(req: Request, body: GroupPickIn) -> GroupPick:
