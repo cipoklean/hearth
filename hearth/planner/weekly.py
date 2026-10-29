@@ -17,14 +17,36 @@ from ..verifier import Candidate, CheckResult, Resolution, ResolutionStatus, ass
 CUISINE_PREFIX = "urn:tag:genre:place:restaurant:"
 RESTAURANT_TAG = "urn:tag:genre:place:restaurant"
 
-# (day, slot, Qloo type) - fixed so plans are reproducible and printable
-SCHEDULE: list[tuple[str, str, str]] = [
-    ("Monday", "meal_theme", "urn:entity:place"),
-    ("Tuesday", "music_session", "urn:entity:artist"),
-    ("Wednesday", "meal_theme", "urn:entity:place"),
-    ("Thursday", "film_night", "urn:entity:movie"),
-    ("Saturday", "outing", "urn:entity:place"),
+A = "urn:entity:artist"
+M = "urn:entity:movie"
+TV = "urn:entity:tv_show"
+B = "urn:entity:book"
+P = "urn:entity:place"
+
+# A full day in a care home: morning, lunch, afternoon, evening. Fixed so plans are reproducible
+# and printable. (day, slot, Qloo type or None for a Hearth-only slot)
+SCHEDULE: list[tuple[str, str, str | None]] = [
+    ("Monday", "morning_music", A), ("Monday", "meal_theme", P), ("Monday", "reading", B), ("Monday", "film_night", M),
+    ("Tuesday", "morning_tv", TV), ("Tuesday", "meal_theme", P), ("Tuesday", "music_session", A), ("Tuesday", "tv_evening", TV),
+    ("Wednesday", "outing", P), ("Wednesday", "meal_theme", P), ("Wednesday", "reading", B), ("Wednesday", "film_night", M),
+    ("Thursday", "morning_music", A), ("Thursday", "meal_theme", P), ("Thursday", "music_session", A), ("Thursday", "tv_evening", TV),
+    ("Friday", "morning_tv", TV), ("Friday", "meal_theme", P), ("Friday", "visitors", None), ("Friday", "film_night", M),
+    ("Saturday", "outing", P), ("Saturday", "meal_theme", P), ("Saturday", "music_session", A), ("Saturday", "film_night", M),
+    ("Sunday", "morning_music", A), ("Sunday", "meal_theme", P), ("Sunday", "rest", None), ("Sunday", "tv_evening", TV),
 ]
+
+# When Qloo has nothing suitable for a slot (few books or shows pass the care rules), fall back
+# to a domain that almost always has picks, in a slot that doesn't clash on the same day.
+FALLBACK: dict[str, tuple[str, str]] = {
+    "reading": ("listening", A),
+    "morning_tv": ("morning_music", A),
+    "tv_evening": ("film_night", M),
+}
+
+STATIC = {
+    "visitors": ("Family & visitors", "kept free for visits; share this week's plan with family so they can join in"),
+    "rest": ("Quiet time & reminiscence", "a gentle afternoon; look through photos or play a few favourites from the playlist"),
+}
 
 
 class PlanItem(BaseModel):
@@ -138,9 +160,10 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
     ranked: dict[str, list[EntityRef]] = {}
     best: dict[str, list[EntityRef]] = {}     # unfiltered lists for "best available" (film/TV)
     fnotes: dict[str, list[str]] = {}
-    for _, _, etype in SCHEDULE:
+    types = {t for _, _, t in SCHEDULE if t} | {t for _, t in FALLBACK.values()}
+    for etype in sorted(types):
         if etype not in ranked:
-            extra = place_extra if etype == "urn:entity:place" else None
+            extra = place_extra if etype == P else None
             if hf := ranked_filters(profile, etype):
                 # Picks and swaps from Qloo's list narrowed to the era / gentle ratings (Hearth settings);
                 # verdicts still measured against the unfiltered best so thresholds keep their meaning.
@@ -157,10 +180,19 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
     used: set[str] = set(skip_ids or [])
     meal_i = 0
     items: list[PlanItem] = []
+
+    def activity(day: str, slot: str, etype: str) -> PlanItem:
+        return _pick_activity(ranked[etype], profile, facts, used, slot, day,
+                              skip_cuisine_only=(slot == "outing"), best_ranked=best.get(etype),
+                              filter_note=fnotes.get(etype))
+
     for day, slot, etype in SCHEDULE:
-        if slot == "meal_theme":
-            if meal_i < len(cuisines):
-                key, name, score, ex = cuisines[meal_i]
+        if etype is None:
+            title, note = STATIC[slot]
+            items.append(PlanItem(day=day, slot=slot, title=title, notes=[note]))
+        elif slot == "meal_theme":
+            if cuisines:
+                key, name, score, ex = cuisines[meal_i % len(cuisines)]
                 items.append(PlanItem(
                     day=day, slot=slot, title=f"{name} lunch", cuisine=key,
                     dishes=dishes_for(key, profile.needs), evidence_places=ex,
@@ -171,7 +203,10 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
                                       notes=["no Qloo cuisine signal with suitable dishes in the menu library"]))
             meal_i += 1
         else:
-            items.append(_pick_activity(ranked[etype], profile, facts, used, slot, day,
-                                        skip_cuisine_only=(slot == "outing"), best_ranked=best.get(etype),
-                                        filter_note=fnotes.get(etype)))
+            it = activity(day, slot, etype)
+            if it.entity is None and slot in FALLBACK:
+                alt = activity(day, *FALLBACK[slot])
+                if alt.entity is not None:
+                    it = alt
+            items.append(it)
     return WeeklyPlan(resident_id=profile.resident_id, name=profile.name, items=items)

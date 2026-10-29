@@ -41,7 +41,7 @@ def test_full_flow(api):
     assert res["Iron Front"]["verdict"] in {"weak", "poor"} and res["Iron Front"]["swap"]
 
     plan = api.get(f"/api/residents/{ada}/plan")
-    assert plan.status_code == 200 and len(plan.json()["items"]) == 5
+    assert plan.status_code == 200 and len(plan.json()["items"]) == 28
 
     g = api.post("/api/group-pick", json={"resident_ids": [ada, bayo, cy], "domain": "movie"})
     assert g.status_code == 200, g.text

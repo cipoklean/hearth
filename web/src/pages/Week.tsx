@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api, type PlanItem, type Profile, type WeeklyPlan } from "../api";
 import { Icon } from "../components/Icon";
 import { EvidenceBlock, ErrorNote, Loading, Photo, Source, Stamp, useToast } from "../components/ui";
-import { DAYS, displayTags, favourites, kindOf, leadFavourite, needInfo, SLOT, VERDICT, yearOf } from "../lib";
+import { DAYS, sentence, displayTags, favourites, kindOf, leadFavourite, needInfo, SLOT, VERDICT, yearOf } from "../lib";
 import { usePlan } from "../plan";
 import { Link } from "../router";
 import { useAsync, useHome } from "../state";
@@ -123,6 +123,12 @@ export function WeekPage({ id }: { id: string }) {
                         const isOpen = open === k;
                         const busy = busySlot === k;
                         const why = oneLiner(it);
+                        if (it.slot === "visitors" || it.slot === "rest") return (
+                          <div key={k} className="slip slip--quiet">
+                            <Icon name={SLOT[it.slot].icon} size={26} />
+                            <div><span className="slip__slot">{SLOT[it.slot].label} · {SLOT[it.slot].time}</span><strong>{it.title}</strong><p className="muted">{sentence(it.notes[0] || "")}.</p></div>
+                          </div>
+                        );
                         return (
                           <article key={k} className={"slip" + (busy ? " is-busy" : "")} aria-busy={busy}>
                             <div className="slip__main">
@@ -206,6 +212,7 @@ function MealEvidence({ it, name }: { it: PlanItem; name: string }) {
 function PrintSheets({ plan, profile, homeName }: { plan: WeeklyPlan; profile: Profile; homeName: string }) {
   const meals = plan.items.filter((i) => i.slot === "meal_theme" && i.dishes.length);
   const session = plan.items.find((i) => i.slot === "music_session" && i.entity);
+  const tracks = plan.items.filter((i) => ["morning_music", "music_session", "listening"].includes(i.slot) && i.entity && i !== session);
   const artists = favourites(profile).filter((e) => kindOf(e.type) === "artist");
   const foodNeeds = profile.needs.filter((n) => ["soft_food", "low_salt", "low_sugar", "vegetarian"].includes(n));
   return (
@@ -256,10 +263,11 @@ function PrintSheets({ plan, profile, homeName }: { plan: WeeklyPlan; profile: P
         <header className="sheet__head">
           <span className="sheet__brand">{homeName} · Playlist</span>
           <h1>Music for {profile.name}</h1>
-          {session && <p>Tuesday music session: <strong>{session.title}</strong>{session.check ? ` (${VERDICT[session.check.verdict].label.toLowerCase()})` : ""}</p>}
+          {session && <p>{session.day} music session: <strong>{session.title}</strong>{session.check ? ` (${VERDICT[session.check.verdict].label.toLowerCase()})` : ""}</p>}
         </header>
         <ol className="playlist">
           {session?.entity && <li><strong>{session.entity.name}</strong> <span>session pick · Qloo</span></li>}
+          {tracks.map((t) => <li key={t.day + t.slot}><strong>{t.title}</strong> <span>{t.day.toLowerCase()} · Qloo</span></li>)}
           {artists.map((a) => <li key={a.id}><strong>{a.name}</strong> <span>a favourite</span></li>)}
         </ol>
         <p className="sheet__foot">Play at a comfortable volume{profile.needs.includes("hearing_support") ? " and use the hearing loop" : ""}.</p>

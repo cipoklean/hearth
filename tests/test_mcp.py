@@ -43,7 +43,7 @@ def test_check_picks(api):
 
 def test_plan_week_and_group(api):
     wp = rpc(api, "tools/call", {"name": "plan_week", "arguments": ADA})["result"]
-    assert wp["isError"] is False and len(wp["structuredContent"]["items"]) == 5
+    assert wp["isError"] is False and len(wp["structuredContent"]["items"]) == 28
     gp = rpc(api, "tools/call", {"name": "group_pick", "arguments": {
         "people": [ADA, {"name": "Bayo", "favourites": [
             {"name": "Teddy Okafor & His Highlife Band", "domain": "artist"}]}], "domain": "movie"}})["result"]

@@ -34,7 +34,7 @@ export interface VerifyReport { profile_name: string; results: CheckResult[]; co
 export interface RuleResult { need: Need; outcome: "pass" | "fail" | "unknown"; reason: string; label: string }
 export interface Dish { name: string; cuisine: string; soft: boolean; low_salt: boolean; low_sugar: boolean; vegetarian: boolean }
 export interface PlanItem {
-  day: string; slot: "meal_theme" | "music_session" | "film_night" | "outing"; title: string;
+  day: string; slot: string; title: string;
   entity: Entity | null; check: CheckResult | null; rules: RuleResult[]; dishes: Dish[];
   evidence_places: string[]; cuisine: string | null; notes: string[];
 }

@@ -111,10 +111,17 @@ export const initials = (name: string) =>
   name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]?.toUpperCase()).join("");
 
 export const SLOT: Record<string, { label: string; icon: string; time: string }> = {
-  meal_theme: { label: "Lunch theme", icon: "plate", time: "12:30" },
-  music_session: { label: "Music session", icon: "note", time: "14:30" },
-  film_night: { label: "Film night", icon: "film", time: "18:30" },
+  morning_music: { label: "Morning music", icon: "note", time: "10:00" },
+  morning_tv: { label: "Morning TV", icon: "tv", time: "10:00" },
   outing: { label: "Outing", icon: "pin", time: "10:30" },
+  meal_theme: { label: "Lunch", icon: "plate", time: "12:30" },
+  reading: { label: "Reading aloud", icon: "book", time: "15:00" },
+  listening: { label: "Afternoon listening", icon: "note", time: "15:00" },
+  music_session: { label: "Music session", icon: "note", time: "15:00" },
+  visitors: { label: "Family & visitors", icon: "people", time: "15:00" },
+  rest: { label: "Quiet time", icon: "tea", time: "15:00" },
+  film_night: { label: "Film night", icon: "film", time: "18:30" },
+  tv_evening: { label: "Evening TV", icon: "tv", time: "18:30" },
 };
 export const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 

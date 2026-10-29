@@ -15,7 +15,10 @@ def test_rank_cuisines_pure():
 async def test_weekly_plan_shape_and_rules(client, ada):
     plan = await weekly_plan(client, ada)
     slots = [(i.day, i.slot) for i in plan.items]
-    assert slots[0] == ("Monday", "meal_theme") and ("Thursday", "film_night") in slots
+    assert ("Monday", "meal_theme") in slots and ("Wednesday", "film_night") in slots
+    for d in ("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"):
+        assert sum(1 for x in slots if x[0] == d) >= 3, d  # a full day, not one item
+    assert len(slots) == len(set(slots))  # (day, slot) is the UI key
     film = next(i for i in plan.items if i.slot == "film_night")
     assert film.entity and film.entity.properties["content_rating"] in {"G", "PG"}  # mild_content
     assert film.check and film.check.evidence.qloo_affinity is not None
