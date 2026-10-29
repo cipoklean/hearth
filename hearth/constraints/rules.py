@@ -84,7 +84,8 @@ CUISINE_ALIASES = {
     "curry": "indian", "north_indian": "indian", "south_indian": "indian",
     "hamburger": "american", "steakhouse": "american", "diner": "american", "southern": "american",
     "greek": "mediterranean", "middle_eastern": "mediterranean", "lebanese": "mediterranean",
-    "nigerian": "west_african", "ghanaian": "west_african", "jamaican": "caribbean",
+    "nigerian": "west_african", "ghanaian": "west_african", "african": "west_african",
+    "west_african": "west_african", "continental": "modern_european", "jamaican": "caribbean",
     "fish": "seafood", "oyster_bar": "seafood",
 }
 CUISINE_NAMES = {

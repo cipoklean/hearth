@@ -16,6 +16,7 @@ from ..verifier import Candidate, CheckResult, Resolution, ResolutionStatus, ass
 
 CUISINE_PREFIX = "urn:tag:genre:place:restaurant:"
 RESTAURANT_TAG = "urn:tag:genre:place:restaurant"
+WIDE_RADIUS = 80_000  # metres
 
 A = "urn:entity:artist"
 M = "urn:entity:movie"
@@ -177,6 +178,18 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
                           extra={**(place_extra or {}), "filter.tags": RESTAURANT_TAG})
     cuisines = [c for c in rank_cuisines(meals or ranked["urn:entity:place"])
                 if dishes_for(c[0], profile.needs) and c[0] not in skip_c]
+    plan_notes: list[str] = []
+    radius = (place_extra or {}).get("filter.location.radius")
+    if len(cuisines) < 3 and radius and radius < WIDE_RADIUS:
+        # Small towns: few restaurants on Qloo nearby, so read the region's food scene instead.
+        wide = await top_for(client, profile, "urn:entity:place", take=50,
+                             extra={**(place_extra or {}), "filter.location.radius": WIDE_RADIUS,
+                                    "filter.tags": RESTAURANT_TAG})
+        have = {c[0] for c in cuisines}
+        cuisines += [c for c in rank_cuisines(wide)
+                     if c[0] not in have and dishes_for(c[0], profile.needs) and c[0] not in skip_c]
+        plan_notes.append(f"Few restaurants near the home on Qloo, so lunch themes use places within "
+                          f"{WIDE_RADIUS // 1000} km.")
     used: set[str] = set(skip_ids or [])
     meal_i = 0
     items: list[PlanItem] = []
@@ -209,4 +222,4 @@ async def weekly_plan(client: QlooClient, profile: Profile, *,
                 if alt.entity is not None:
                     it = alt
             items.append(it)
-    return WeeklyPlan(resident_id=profile.resident_id, name=profile.name, items=items)
+    return WeeklyPlan(resident_id=profile.resident_id, name=profile.name, items=items, notes=plan_notes)

@@ -154,6 +154,10 @@ async def group_pick(client: QlooClient, profiles: list[Profile], domain: str, *
     pick = choose(allowed, rel, profiles, th)
     out.pick = pick
     if pick is None:
+        if not candidates and per_person < 15:
+            # Bigger groups rule out more: look deeper into everyone's Qloo list before giving up.
+            return await group_pick(client, profiles, domain, facts=facts, per_person=15, th=th,
+                                    place_extra=place_extra)
         return out
 
     for p in profiles:

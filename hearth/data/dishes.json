@@ -432,6 +432,54 @@
    "low_salt": true,
    "low_sugar": true,
    "vegetarian": false
+  },
+  {
+   "name": "Ofe onugbu (bitter-leaf soup), smooth",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Akamu (pap) with moi moi",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Ripe plantain porridge",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": false,
+   "vegetarian": true
+  },
+  {
+   "name": "Beans and soft plantain (ewa)",
+   "cuisine": "west_african",
+   "soft": true,
+   "low_salt": true,
+   "low_sugar": true,
+   "vegetarian": true
+  },
+  {
+   "name": "Okra soup with soft eba",
+   "cuisine": "west_african",
+   "soft": false,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": false
+  },
+  {
+   "name": "Abacha (African salad)",
+   "cuisine": "west_african",
+   "soft": false,
+   "low_salt": false,
+   "low_sugar": true,
+   "vegetarian": true
   }
  ]
 }
