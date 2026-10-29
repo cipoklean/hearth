@@ -210,9 +210,12 @@ def _parse_entity(e: Mapping[str, Any]) -> EntityRef:
             props["distance"] = q["distance"]
         if ex := _parse_explainability(q):
             props["explainability"] = ex
+    name = str(e.get("name") or "")
+    if P.normalize_type(etype) in ("urn:entity:place", "urn:entity:destination"):
+        name = _tidy_place_name(name)
     return EntityRef(
         id=str(e.get("entity_id") or e.get("id")),
-        name=str(e.get("name") or ""),
+        name=name,
         type=P.normalize_type(etype),
         tags=[_parse_tag(t) for t in (e.get("tags") or []) if isinstance(t, Mapping)],
         properties=props,
@@ -226,10 +229,40 @@ def parse_search(data: Mapping[str, Any]) -> list[EntityRef]:
     return [_parse_entity(e) for e in res if isinstance(e, Mapping)]
 
 
+# Hearth content rule, not Qloo: titles built on racist caricature are never suggested,
+# even when Qloo's taste graph links them to someone's favourites.
+_BLOCKED_TITLES = {
+    "amosnandy", "amosnandyshow", "theamosnandyshow", "amosandandy", "theamosandandyshow",
+    "songofthesouth", "thebirthofanation", "birthofanation",
+    "theblackandwhiteminstrelshow", "blackandwhiteminstrelshow",
+}
+_SMALL_WORDS = {"a", "an", "and", "at", "by", "de", "for", "in", "of", "on", "the", "to"}
+
+
+def _norm_title(name: str) -> str:
+    return "".join(ch for ch in name.lower() if ch.isalnum())
+
+
+def is_blocked(e: EntityRef) -> bool:
+    return _norm_title(e.name) in _BLOCKED_TITLES
+
+
+def _tidy_place_name(name: str) -> str:
+    """Qloo has some landmark names in lower case ("Big ben"); title-case those only."""
+    words = name.split()
+    if len(words) < 2 or not words[0][:1].isupper():
+        return name
+    rest = [w for w in words[1:] if w.lower() not in _SMALL_WORDS]
+    if not rest or not all(w.isalpha() and w.islower() for w in rest):
+        return name
+    return " ".join([words[0]] + [w if w in _SMALL_WORDS else w.capitalize() for w in words[1:]])
+
+
 def parse_insights(data: Mapping[str, Any]) -> list[EntityRef]:
     res = data.get("results") or {}
     ents = res.get("entities") if isinstance(res, Mapping) else res
-    return [_parse_entity(e) for e in (ents or []) if isinstance(e, Mapping)]
+    out = [_parse_entity(e) for e in (ents or []) if isinstance(e, Mapping)]
+    return [e for e in out if not is_blocked(e)]
 
 
 def parse_tags(data: Mapping[str, Any]) -> list[Tag]:
